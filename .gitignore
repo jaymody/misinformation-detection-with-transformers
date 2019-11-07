@@ -1,0 +1,27 @@
+# dirs
+data/
+rules/
+submissions/
+
+# os
+.DS_Store
+
+# compiles
+__pycache__/
+*.py[cod]
+
+# jupyter
+.ipynb_checkpoints
+
+# misc
+.vscode
+todo.txt
+
+# env
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
