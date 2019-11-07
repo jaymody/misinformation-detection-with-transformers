@@ -56,7 +56,7 @@ def main(data_path, articles_dir, predictions_fpath, model_dir, keep_n, nproc, n
     predictions = predict(df["text"], df["id"], model)
     
     ## Write Predictions
-    with open(predictions_fpath, 'w') as fo:
+    with open(predictions_fpath, 'w', encoding="utf-8") as fo:
         for claim_id, prediction in predictions.items():
             fo.write("%d,%d\n" % (claim_id, prediction))
     

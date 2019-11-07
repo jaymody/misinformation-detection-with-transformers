@@ -61,13 +61,13 @@ def _split_and_clean(x):
 def preprocess(data_path, articles_dir, nproc=1):
     # Load data
     logger.info("... loading train data ...")
-    with open(data_path, 'r') as fi:
+    with open(data_path, 'r', encoding="utf-8") as fi:
         raw_data = json.load(fi)
         
     logger.info("... loading articles data ...")
     raw_articles_data = {}
     for fpath in tqdm(glob.glob(os.path.join(articles_dir, "*.txt"))):
-        with open(fpath, 'r') as fi:
+        with open(fpath, 'r', encoding="utf-8") as fi:
             raw_articles_data[os.path.basename(fpath).split(".")[0]] = fi.read()
     
     # Clean claim text in training data
