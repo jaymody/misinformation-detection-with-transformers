@@ -34,7 +34,6 @@ logger.handlers = [sh]
 #### Main ####
 def main(data_path, articles_dir, predictions_fpath, model_dir, keep_n, nproc, ngpu):
     ## Preproccess
-    # WARNING: articles_data becomes global namespace watch out!
     data, articles = preprocess(data_path, articles_dir, nproc)
     
     ## Create Examples

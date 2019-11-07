@@ -17,7 +17,7 @@ sh.setFormatter(formatter)
 logger.handlers = [sh]
 
 
-#### Load Model ####
+#### Model ####
 def basic_config(output_dir, cache_dir, fp16=False, max_seq_length=256, train_batch_size=8, nproc=1, ngpu=0):
     return {
         "output_dir": output_dir,
@@ -51,6 +51,8 @@ def load_model(model_dir, model_args):
     logger.info("... loading model ...")
     return TransformerModel('xlnet', model_dir, num_labels=3, args=model_args)
   
+
+#### Predict ####
 def predict_proba(examples_text, claim_ids, model):
     logger.info("... predicting ...")
     model_outputs = model.predict(examples_text)
