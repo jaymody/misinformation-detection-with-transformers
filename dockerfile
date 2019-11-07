@@ -1,8 +1,11 @@
 FROM pytorch/pytorch:latest
 
-ADD . /usr/src/
+ADD valerie/ /usr/src/
+ADD model/ /usr/src/
+ADD requirements.txt /usr/src/
 WORKDIR /usr/src/
 
-RUN pip3 install -r requirements
+RUN pip install -r requirements.txt
+RUN python -m nltk.downloader punkt
 
 CMD [ "bash", "/usr/src/run" ]

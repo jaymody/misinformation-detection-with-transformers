@@ -1,0 +1,15 @@
+#!/bin/bash
+
+DATA_PATH='/usr/local/dataset/metadata.json'
+ARTICLES_DIR='/usr/local/dataset/articles'
+PREDICTIONS_FPATH='/usr/local/predictions.txt'
+DIR='/usr/src'
+
+python ${DIR}/valerie/main.py \
+    --data_path ${DATA_PATH} \
+    --articles_dir ${ARTICLES_DIR} \
+    --predictions_fpath {PREDICTIONS_FPATH}\
+    --model_dir ${DIR}/model/ \
+    --keep_n 5 \
+    --nproc 4 \
+    --ngpu 1
