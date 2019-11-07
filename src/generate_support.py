@@ -17,7 +17,6 @@ sh = logging.StreamHandler()
 sh.setLevel(logging.INFO)
 sh.setFormatter(formatter)
 logger.handlers = [sh]
-logger.info('*** Logging Configurated ***')
 
 
 #### Create Support for Single Claim ####

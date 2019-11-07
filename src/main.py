@@ -29,17 +29,16 @@ sh = logging.StreamHandler()
 sh.setLevel(logging.INFO)
 sh.setFormatter(formatter)
 logger.handlers = [sh]
-logger.info('*** Logging Configurated ***')
 
 
 #### Main ####
 def main(data_path, articles_dir, predictions_fpath, model_dir, keep_n, nproc, ngpu):
     ## Preproccess
     # WARNING: articles_data becomes global namespace watch out!
-    data = preprocess(data_path, articles_dir, nproc)
+    data, articles = preprocess(data_path, articles_dir, nproc)
     
     ## Create Examples
-    samples = generate_support(data, nproc)
+    samples = generate_support(data, articles, keep_n, nproc)
     examples = []
     for sample in samples:
         for support in sample["support"]:

@@ -15,7 +15,6 @@ sh = logging.StreamHandler()
 sh.setLevel(logging.INFO)
 sh.setFormatter(formatter)
 logger.handlers = [sh]
-logger.info('*** Logging Configurated ***')
 
 
 #### Load Model ####
@@ -49,9 +48,11 @@ def basic_config(output_dir, cache_dir, fp16=False, max_seq_length=256, train_ba
     }
 
 def load_model(model_dir, model_args):
+    logger.info("... loading model ...")
     return TransformerModel('xlnet', model_dir, num_labels=3, args=model_args)
   
 def predict_proba(examples_text, claim_ids, model):
+    logger.info("... predicting ...")
     model_outputs = model.predict(examples_text)
     
     probs = collections.defaultdict(list)
