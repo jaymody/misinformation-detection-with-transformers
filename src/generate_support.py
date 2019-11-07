@@ -4,7 +4,7 @@ import heapq
 import logging
 import multiprocessing
 
-# Third Party Packaged
+# Third Party Packages
 from tqdm import tqdm
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer

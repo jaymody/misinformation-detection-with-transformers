@@ -3,7 +3,7 @@
 import logging
 import collections
 
-# Third Party Packaged
+# Third Party Packages
 import numpy as np
 from simpletransformers.model import TransformerModel
 

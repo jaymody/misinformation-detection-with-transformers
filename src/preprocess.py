@@ -8,7 +8,7 @@ import logging
 import unicodedata
 import multiprocessing
 
-# Third Party Packaged
+# Third Party Packages
 import nltk
 from tqdm import tqdm
 
