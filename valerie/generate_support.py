@@ -5,7 +5,11 @@ import logging
 import multiprocessing
 
 # Third Party Packages
+import nltk
+import gensim
+import numpy as np
 from tqdm import tqdm
+from scipy import spatial
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 
@@ -30,35 +34,61 @@ def generate_support_from_claim(sample, keep_n=5):
     references.append(None)
 
     # Get tf_idf vectors
-    vectorizer = TfidfVectorizer()
-    vectors = vectorizer.fit_transform(sentences)
+    tfidf_vectorizer = TfidfVectorizer()
+    tfidf_vectors = tfidf_vectorizer.fit_transform(sentences)
+
+    # Get sentence word2vec vectors
+    def word2vec_sentence(sentence):
+        words = nltk.tokenize.word_tokenize(sentence)
+        vectors = []
+        for word in words:
+            try:
+                vectors.append(word2vec_model[word])
+            except:
+                continue
+        return np.nan if not vectors else np.mean(vectors, axis=0)
+    word2vec_vectors = [word2vec_sentence(sentence) for sentence in sentences]
     
-    # Calculate and sort cosine similarities
+    # Calculate and sort cosine similarities for embeddings
     support = []
-    for ref, sentence, vector in zip(references, sentences, vectors):
+    for ref, sentence, tfidf_vector, word2vec_vector in zip(references, sentences, tfidf_vectors, word2vec_vectors):
         support.append({
             "source_article": ref,
             "text": sentence,
-            "cosine_similarity": float(cosine_similarity(vectors[-1], vector))
+            "scores": {
+                "tfidf": float(cosine_similarity(tfidf_vectors[-1], tfidf_vector)),
+                "word2vec": 0.0 if np.isnan(np.min(word2vec_vector)) else float(1 - spatial.distance.cosine(word2vec_vectors[-1], word2vec_vector))
+            }
         })
+    # Calculate overall similarity (mean of cosine similarities)
+    for s in support:
+        s["score"] = float(np.mean(list(s["scores"].values()), axis=0))
     support.pop() # remove the claim sentence itself from support
 
     # Sort or get nlargest
     if keep_n:
-        support = heapq.nlargest(keep_n, support, key=lambda x: x["cosine_similarity"])
+        support = heapq.nlargest(keep_n, support, key=lambda x: x["score"])
     else:
-        support = sorted(keep_n, key=lambda x: x["cosine_similarity"], reverse=True)
+        support = sorted(support, key=lambda x: x["score"], reverse=True)
     
     # Update and return sample
     sample["support"] = support
     return sample
 
+#### Load word2vec Model ####
+def load_word2vec(word2vec_path):
+    return gensim.models.KeyedVectors.load_word2vec_format(word2vec_path, binary=True) 
 
 #### Create Support for All Data ####
-def generate_support(data, _articles_data, keep_n=5, nproc=1): 
+def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1): 
     # Make articles_data global
     global articles_data
     articles_data = _articles_data
+
+    # Load and globalize word2vec model
+    logger.info("... loading word2vec model ...")
+    global word2vec_model
+    word2vec_model = load_word2vec(word2vec_path)
 
     # Multiprocessing
     pool = multiprocessing.Pool(nproc)

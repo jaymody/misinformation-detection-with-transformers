@@ -30,7 +30,7 @@ RUN conda install pytorch cudatoolkit=10.0 -c pytorch && \
     conda install scikit-learn tqdm nltk pandas && \
     conda clean -afy
 
-RUN pip install tensorboardx simpletransformers
+RUN pip install tensorboardx simpletransformers gensim
 RUN python -m nltk.downloader punkt
 
 CMD [ "bash", "/usr/src/run" ]

@@ -3,13 +3,16 @@
 DATA_PATH='/usr/local/dataset/metadata.json'
 ARTICLES_DIR='/usr/local/dataset/articles'
 PREDICTIONS_FPATH='/usr/local/predictions.txt'
+MODEL_DIR='models/xlnet/'
+WORD2VEC_PATH='models/GoogleNews-vectors-negative300.bin'
 DIR='/usr/src'
 
 python ${DIR}/valerie/main.py \
     --data_path ${DATA_PATH} \
     --articles_dir ${ARTICLES_DIR} \
-    --predictions_fpath {PREDICTIONS_FPATH}\
-    --model_dir ${DIR}/model/ \
+    --predictions_fpath ${PREDICTIONS_FPATH}\
+    --model_dir ${DIR}/${MODEL_DIR} \
+    --word2vec_path ${DIR}/${WORD2VEC_PATH} \
     --keep_n 5 \
     --nproc 4 \
     --ngpu 1

@@ -1,8 +1,9 @@
-# dirs
+# dirs/files
 data/
 rules/
 submissions/
 models/
+run_test
 
 # os
 .DS_Store

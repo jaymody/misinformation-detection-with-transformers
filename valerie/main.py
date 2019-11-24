@@ -17,6 +17,7 @@ parser.add_argument("--data_path", type=str)
 parser.add_argument("--articles_dir", type=str)
 parser.add_argument("--predictions_fpath", type=str)
 parser.add_argument("--model_dir", type=str)
+parser.add_argument("--word2vec_path", type=str)
 parser.add_argument("--keep_n", type=int)
 parser.add_argument("--nproc", type=int)
 parser.add_argument("--ngpu", type=int)
@@ -32,12 +33,12 @@ logger.handlers = [sh]
 
 
 #### Main ####
-def main(data_path, articles_dir, predictions_fpath, model_dir, keep_n, nproc, ngpu):
+def main(data_path, articles_dir, predictions_fpath, model_dir, word2vec_path, keep_n, nproc, ngpu):
     ## Preproccess
     data, articles = preprocess(data_path, articles_dir, nproc)
     
     ## Create Examples
-    samples = generate_support(data, articles, keep_n, nproc)
+    samples = generate_support(data, articles, word2vec_path, keep_n, nproc)
     examples = []
     for sample in samples:
         for support in sample["support"]:
