@@ -9,7 +9,7 @@ import pandas as pd
 # Project Imports
 from preprocess import preprocess
 from generate_support import generate_support
-from predict import basic_config, load_model, predict
+from predict import load_params, load_model, predict
 
 # CLI
 parser = argparse.ArgumentParser("Predict true, partly true, or false, for fake news data.")
@@ -17,6 +17,7 @@ parser.add_argument("--data_path", type=str)
 parser.add_argument("--articles_dir", type=str)
 parser.add_argument("--predictions_fpath", type=str)
 parser.add_argument("--model_dir", type=str)
+parser.add_argument("--params_fpath", type=str)
 parser.add_argument("--word2vec_path", type=str)
 parser.add_argument("--keep_n", type=int)
 parser.add_argument("--nproc", type=int)
@@ -33,7 +34,7 @@ logger.handlers = [sh]
 
 
 #### Main ####
-def main(data_path, articles_dir, predictions_fpath, model_dir, word2vec_path, keep_n, nproc, ngpu):
+def main(data_path, articles_dir, predictions_fpath, model_dir, params_fpath, word2vec_path, keep_n, nproc, ngpu):
     ## Preproccess
     data, articles = preprocess(data_path, articles_dir, nproc)
     
@@ -48,7 +49,7 @@ def main(data_path, articles_dir, predictions_fpath, model_dir, word2vec_path, k
             })
     
     ## Load Model
-    model_args = basic_config("outputs/", "cache/", nproc=nproc, ngpu=ngpu)
+    model_args = load_params(params_fpath, nproc=nproc, ngpu=ngpu)
     model = load_model(model_dir, model_args)
     
     ## Predict

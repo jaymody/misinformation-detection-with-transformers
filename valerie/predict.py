@@ -1,5 +1,6 @@
 #### Setup ####
 # Python Standard Library
+import json
 import logging
 import collections
 
@@ -18,36 +19,14 @@ logger.handlers = [sh]
 
 
 #### Model ####
-def basic_config(output_dir, cache_dir, fp16=False, max_seq_length=128, train_batch_size=8, evaluate_during_training=False, nproc=1, ngpu=0):
-    return {
-        'output_dir': output_dir,
-        'cache_dir': cache_dir,
-
-        'fp16': fp16,
-        'fp16_opt_level': 'O1',
-        'max_seq_length': max_seq_length,
-        'train_batch_size': train_batch_size,
-        'gradient_accumulation_steps': 1,
-        'eval_batch_size': 4,
-        'num_train_epochs': 4,
-        'weight_decay': 0,
-        'learning_rate': 4e-5,
-        'adam_epsilon': 1e-8,
-        'warmup_ratio': 0.06,
-        'warmup_steps': 2000,
-        'max_grad_norm': 1.0,
-
-        'logging_steps': 100,
-        'save_steps': 2000,
-        'evaluate_during_training': evaluate_during_training,
-
-        'overwrite_output_dir': False,
-        'reprocess_input_data': False,
-
-        'process_count': nproc,
-        'n_gpu': ngpu,
-        'silent': False,
-    }
+def load_params(params_fpath, nproc=1, ngpu=0, eval_batch_size=None):
+    with open(params_fpath, 'r') as fi:
+        params = json.load(fi)
+    params['process_count'] = nproc
+    params['n_gpu'] = ngpu
+    if eval_batch_size:
+        params['eval_batch_size'] = eval_batch_size
+    return params
 
 def load_model(model_dir, model_args):
     logger.info("... loading model ...")

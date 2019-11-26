@@ -4,6 +4,8 @@ rules/
 submissions/
 models/
 run_test
+run_submission
+run_vm
 
 # os
 .DS_Store
