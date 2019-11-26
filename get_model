@@ -1,9 +1,0 @@
-#!/bin/bash
-
-MODEL_DIR="MODEL_DIR"
-CHECKPOINT="checkpoint-xxxxxx"
-
-mkdir models
-cp ~/common/GoogleNews-vectors-negative300.bin models/
-gsutil cp -r gs://valerie_0/models/${MODEL_DIR}/checkpoints/${CHECKPOINT} models/
-mv models/${CHECKPOINT} models/xlnet
