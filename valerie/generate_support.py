@@ -24,7 +24,7 @@ logger.handlers = [sh]
 
 
 #### Create Support for Single Claim ####
-def generate_support_from_claim(sample, keep_n=5):
+def generate_support_from_claim(sample, keep_n=8, min_threshold=0.40, min_examples=4):
     # Get sentences from related_articles
     corpus = [(ref,sentence) for ref in sample["related_articles"] for sentence in articles_data[str(ref)]]
     references, sentences = map(list, zip(*corpus))
@@ -68,6 +68,8 @@ def generate_support_from_claim(sample, keep_n=5):
     # Sort or get nlargest
     if keep_n:
         support = heapq.nlargest(keep_n, support, key=lambda x: x["score"])
+        support = sorted(support, key=lambda x: x["score"], reverse=True)
+        support = [s for i,s in enumerate(support) if s["score"] >= min_threshold or i < min_examples]
     else:
         support = sorted(support, key=lambda x: x["score"], reverse=True)
     
