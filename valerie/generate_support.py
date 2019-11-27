@@ -1,5 +1,6 @@
 #### Setup ####
 # Python Standard Library
+import gc
 import heapq
 import logging
 import multiprocessing
@@ -101,4 +102,7 @@ def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1):
     for sample in tqdm(pool.imap_unordered(generate_support_from_claim, data), total=len(data)):
         samples.append(sample)
 
+    del word2vec_model
+    gc.collect()
+    
     return samples
