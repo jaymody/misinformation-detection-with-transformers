@@ -101,8 +101,47 @@ def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1):
     samples = []
     for sample in tqdm(pool.imap_unordered(generate_support_from_claim, data), total=len(data)):
         samples.append(sample)
-
-    del word2vec_model
-    gc.collect()
     
     return samples
+
+
+### Main ###
+def main(data_path, articles_dir, output_fpath, word2vec_path, keep_n, nproc, ngpu):
+    ## Preproccess
+    data, articles = preprocess(data_path, articles_dir, nproc)
+    
+    ## Create Examples
+    samples = generate_support(data, articles, word2vec_path, keep_n, nproc)
+    examples = []
+    for sample in samples:
+        for support in sample["support"]:
+            examples.append({
+                "text": sample["claim"] + " " + support["text"],
+                "id": sample["id"]
+            })
+    
+    ## Predict
+    logger.info("... saving examples to dataframe ...")
+    df = pd.DataFrame.from_records(examples)
+    df.to_csv(output_fpath)
+
+
+### Main Call ###
+if __name__ == "__main__":
+    # Main Imports
+    import argparse
+    import pandas as pd
+    from preprocess import preprocess
+
+    # CLI
+    parser = argparse.ArgumentParser("Predict true, partly true, or false, for fake news data.")
+    parser.add_argument("--data_path", type=str)
+    parser.add_argument("--articles_dir", type=str)
+    parser.add_argument("--output_fpath", type=str)
+    parser.add_argument("--word2vec_path", type=str)
+    parser.add_argument("--keep_n", type=int)
+    parser.add_argument("--nproc", type=int)
+    parser.add_argument("--ngpu", type=int)
+
+    args = parser.parse_args()
+    main(**args.__dict__)

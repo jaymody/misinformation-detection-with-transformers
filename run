@@ -1,20 +1,29 @@
 #!/bin/bash
 
-DATA_PATH='/usr/local/dataset/metadata.json'
-ARTICLES_DIR='/usr/local/dataset/articles'
-PREDICTIONS_FPATH='/usr/local/predictions.txt'
-MODEL_DIR='models/xlnet/'
-WORD2VEC_PATH='models/GoogleNews-vectors-negative300.bin'
-PARAMS_PATH='models/params.json'
-DIR='/usr/src'
+DATA_PATH="/usr/local/dataset/metadata.json"
+ARTICLES_DIR="/usr/local/dataset/articles"
+PREDICTIONS_FPATH="/usr/local/predictions.txt"
+DIR="/usr/src"
+INTERMEDIATE_PATH="${DIR}/data.csv"
+WORD2VEC_PATH="${DIR}/models/GoogleNews-vectors-negative300.bin"
+MODEL_DIR="${DIR}/models/xlnet/"
+PARAMS_PATH="${DIR}/models/params.json"
 
-python ${DIR}/valerie/main.py \
+
+python ${DIR}/valerie/generate_support.py \
     --data_path ${DATA_PATH} \
     --articles_dir ${ARTICLES_DIR} \
-    --predictions_fpath ${PREDICTIONS_FPATH}\
-    --model_dir ${DIR}/${MODEL_DIR} \
-    --word2vec_path ${DIR}/${WORD2VEC_PATH} \
-    --params_fpath ${DIR}/${PARAMS_PATH} \
+    --output_fpath ${INTERMEDIATE_PATH}\
+    --word2vec_path ${WORD2VEC_PATH} \
     --keep_n 5 \
     --nproc 4 \
-    --ngpu 1
+    --ngpu 0
+
+
+python ${DIR}/valerie/predict.py \
+    --data_path ${INTERMEDIATE_PATH} \
+    --predictions_fpath ${PREDICTIONS_FPATH}\
+    --model_dir ${MODEL_DIR} \
+    --params_fpath ${PARAMS_PATH} \
+    --nproc 4 \
+    --ngpu 0
