@@ -26,11 +26,11 @@ RUN /bin/bash -c "source activate base"
 WORKDIR /usr/src/
 ADD . /usr/src
 
-RUN conda install pytorch cudatoolkit=10.0 -c pytorch && \
+RUN conda install pytorch=1.3.0 cudatoolkit=10.0 -c pytorch && \
     conda install scikit-learn tqdm nltk pandas && \
     conda clean -afy
 
-RUN pip install tensorboardx transformers==2.1.1 simpletransformers gensim
+RUN pip install tensorboardx transformers==2.1.1 simpletransformers==0.5.0 gensim
 RUN python -m nltk.downloader punkt
 
 CMD [ "bash", "/usr/src/run" ]
