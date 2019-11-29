@@ -6,7 +6,7 @@ PREDICTIONS_FPATH="/usr/local/predictions.txt"
 DIR="/usr/src"
 INTERMEDIATE_PATH="${DIR}/data.csv"
 WORD2VEC_PATH="${DIR}/models/GoogleNews-vectors-negative300.bin"
-MODEL_DIR="${DIR}/models/roberta/"
+MODEL_DIR="${DIR}/models/transformer/"
 PARAMS_PATH="${DIR}/models/params.json"
 
 
