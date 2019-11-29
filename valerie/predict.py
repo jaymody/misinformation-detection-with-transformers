@@ -30,7 +30,7 @@ def load_params(params_fpath, nproc=1, ngpu=0, eval_batch_size=None):
 
 def load_model(model_dir, model_args):
     logger.info("... loading model ...")
-    return TransformerModel('xlnet', model_dir, num_labels=3, args=model_args)
+    return TransformerModel('roberta', model_dir, num_labels=3, args=model_args)
   
 
 #### Predict ####
