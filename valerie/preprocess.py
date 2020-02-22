@@ -63,26 +63,26 @@ def preprocess(data_path, articles_dir, nproc=1):
     logger.info("... loading train data ...")
     with open(data_path, 'r', encoding="utf-8") as fi:
         raw_data = json.load(fi)
-        
+
     logger.info("... loading articles data ...")
     raw_articles_data = {}
     for fpath in tqdm(glob.glob(os.path.join(articles_dir, "*.txt"))):
         with open(fpath, 'r', encoding="utf-8") as fi:
             raw_articles_data[os.path.basename(fpath).split(".")[0]] = fi.read()
-    
+
     # Clean claim text in training data
     logger.info("... cleaning train data ...")
     data = copy.deepcopy(raw_data)
     for example in tqdm(data):
         example["claim"] = _clean_text(example["claim"])
-    
+
     # Split articles into sentences and clean text
     logger.info("... cleaning articles data ...")
-    
+
     articles_data = {}
     pool = multiprocessing.Pool(nproc)
 
     for k,v in tqdm(pool.imap_unordered(_split_and_clean, raw_articles_data.items()), total=len(raw_articles_data)):
         articles_data[k] = v
-    
+
     return data, articles_data

@@ -37,7 +37,7 @@ logger.handlers = [sh]
 def main(data_path, articles_dir, predictions_fpath, model_dir, params_fpath, word2vec_path, keep_n, nproc, ngpu):
     ## Preproccess
     data, articles = preprocess(data_path, articles_dir, nproc)
-    
+
     ## Create Examples
     samples = generate_support(data, articles, word2vec_path, keep_n, nproc)
     examples = []
@@ -47,20 +47,20 @@ def main(data_path, articles_dir, predictions_fpath, model_dir, params_fpath, wo
                 "text": sample["claim"] + " " + support["text"],
                 "id": sample["id"]
             })
-    
+
     ## Load Model
     model_args = load_params(params_fpath, nproc=nproc, ngpu=ngpu)
     model = load_model(model_dir, model_args)
-    
+
     ## Predict
     df = pd.DataFrame.from_records(examples)
     predictions = predict(df["text"], df["id"], model)
-    
+
     ## Write Predictions
     with open(predictions_fpath, 'w', encoding="utf-8") as fo:
         for claim_id, prediction in predictions.items():
             fo.write("%d,%d\n" % (claim_id, prediction))
-    
+
     ## End of Main
     logger.info("DONE main()")
 

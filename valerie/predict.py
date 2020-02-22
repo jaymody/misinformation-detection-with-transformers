@@ -31,17 +31,17 @@ def load_params(params_fpath, nproc=1, ngpu=0, eval_batch_size=None):
 def load_model(model_dir, model_args):
     logger.info("... loading model ...")
     return TransformerModel('roberta', model_dir, num_labels=3, args=model_args)
-  
+
 
 #### Predict ####
 def predict_proba(examples_text, claim_ids, model):
     logger.info("... predicting ...")
     model_outputs = model.predict(examples_text)
-    
+
     probs = collections.defaultdict(list)
     for claim_id, prob in zip(claim_ids, model_outputs[:][1]):
         probs[claim_id].append(prob)
-        
+
     averaged_probs = {k: np.mean(v, axis=0) for k,v in probs.items()}
     return averaged_probs
 
@@ -59,7 +59,7 @@ def main(data_path, predictions_fpath, model_dir, params_fpath, nproc, ngpu):
     ## Predict
     df = pd.read_csv(data_path)
     predictions = predict(df["text"], df["id"], model)
-    
+
     ## Write Predictions
     with open(predictions_fpath, 'w', encoding="utf-8") as fo:
         for claim_id, prediction in predictions.items():

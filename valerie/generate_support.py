@@ -29,7 +29,7 @@ def generate_support_from_claim(sample, keep_n=8, min_threshold=0.40, min_exampl
     # Get sentences from related_articles
     corpus = [(ref,sentence) for ref in sample["related_articles"] for sentence in articles_data[str(ref)]]
     references, sentences = map(list, zip(*corpus))
-    
+
     # Append and pad claim sentence
     sentences.append(sample["claim"])
     references.append(None)
@@ -49,7 +49,7 @@ def generate_support_from_claim(sample, keep_n=8, min_threshold=0.40, min_exampl
                 continue
         return np.nan if not vectors else np.mean(vectors, axis=0)
     word2vec_vectors = [word2vec_sentence(sentence) for sentence in sentences]
-    
+
     # Calculate and sort cosine similarities for embeddings
     support = []
     for ref, sentence, tfidf_vector, word2vec_vector in zip(references, sentences, tfidf_vectors, word2vec_vectors):
@@ -73,17 +73,17 @@ def generate_support_from_claim(sample, keep_n=8, min_threshold=0.40, min_exampl
         support = [s for i,s in enumerate(support) if s["score"] >= min_threshold or i < min_examples]
     else:
         support = sorted(support, key=lambda x: x["score"], reverse=True)
-    
+
     # Update and return sample
     sample["support"] = support
     return sample
 
 #### Load word2vec Model ####
 def load_word2vec(word2vec_path):
-    return gensim.models.KeyedVectors.load_word2vec_format(word2vec_path, binary=True) 
+    return gensim.models.KeyedVectors.load_word2vec_format(word2vec_path, binary=True)
 
 #### Create Support for All Data ####
-def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1): 
+def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1):
     # Make articles_data global
     global articles_data
     articles_data = _articles_data
@@ -101,7 +101,7 @@ def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1):
     samples = []
     for sample in tqdm(pool.imap_unordered(generate_support_from_claim, data), total=len(data)):
         samples.append(sample)
-    
+
     return samples
 
 
@@ -109,7 +109,7 @@ def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1):
 def main(data_path, articles_dir, output_fpath, word2vec_path, keep_n, nproc, ngpu):
     ## Preproccess
     data, articles = preprocess(data_path, articles_dir, nproc)
-    
+
     ## Create Examples
     samples = generate_support(data, articles, word2vec_path, keep_n, nproc)
     examples = []
@@ -119,7 +119,7 @@ def main(data_path, articles_dir, output_fpath, word2vec_path, keep_n, nproc, ng
                 "text": sample["claim"] + " " + support["text"],
                 "id": sample["id"]
             })
-    
+
     ## Predict
     logger.info("... saving examples to dataframe ...")
     df = pd.DataFrame.from_records(examples)
