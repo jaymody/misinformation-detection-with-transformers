@@ -2,8 +2,8 @@
 archive/
 logs/
 data/
-rules/
-submissions/
+legal/
+info/
 models/
 run_test
 run_submission
