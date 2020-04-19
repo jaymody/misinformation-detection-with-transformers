@@ -1,13 +1,10 @@
 """Generate supporting metadata for sentence pair selection."""
-import gc
 import heapq
 import logging
-import multiprocessing
 
 import nltk
 import gensim
 import numpy as np
-from tqdm import tqdm
 from scipy import spatial
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -15,20 +12,57 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 _logger = logging.getLogger(__name__)
 
 
-def generate_support_from_claim(sample, keep_n=8, min_threshold=0.40, min_examples=4):
-    # Get sentences from related_articles
+def generate_support(sample, articles_data, word2vec_model, keep_n=8, min_threshold=0.40, min_examples=4):
+    """Generate nlp metadata for a claim.
+
+    This function finds sentences from the list of related articles that best
+    match the contents of the claim.
+
+    To achieve this, it first computes the tfidf and word2vec embeddings for
+    both the claim, and all the sentences in the related articles. It then takes
+    cosine similarity between each of these claim-sentence pairs to quantify
+    their similarity (one tfidf score and one word2vec score for each pair). It
+    takes the average of the tfidf and word2vec similarities and adds the
+    top `keep_n` matching sentences for each claim along with their scores and
+    source article identifier.
+
+    Parameters
+    ----------
+    sample : dict
+        Single entry from phase1 metadata.json containing claim,
+        related_articles, and other metadata.
+    articles_data : dict
+        Dictionary of the related articles where the keys are the related
+        article id and the values are a list of sentences (as strs).
+    word2vec_model
+        Loaded gensim word2vec model.
+    keep_n : int
+        Max number of related sentences to keep.
+    min_threshold : float
+        Minimum score (between 0 and 1) the claim-sentence pair must be achieved
+        to be included in the output (after `min_examples` examples have been
+        chosen).
+    min_examples : int
+        Minimum number of examples to include in the output.
+
+    Returns
+    -------
+    sample : dict
+        Returns the generated nlp metadata.
+    """
+    # get sentences from related_articles
     corpus = [(ref,sentence) for ref in sample["related_articles"] for sentence in articles_data[str(ref)]]
     references, sentences = map(list, zip(*corpus))
 
-    # Append and pad claim sentence
+    # append and pad claim sentence
     sentences.append(sample["claim"])
     references.append(None)
 
-    # Get tf_idf vectors
+    # get tf_idf vectors
     tfidf_vectorizer = TfidfVectorizer()
     tfidf_vectors = tfidf_vectorizer.fit_transform(sentences)
 
-    # Get sentence word2vec vectors
+    # get sentence word2vec vectors
     def word2vec_sentence(sentence):
         words = nltk.tokenize.word_tokenize(sentence)
         vectors = []
@@ -40,7 +74,7 @@ def generate_support_from_claim(sample, keep_n=8, min_threshold=0.40, min_exampl
         return np.nan if not vectors else np.mean(vectors, axis=0)
     word2vec_vectors = [word2vec_sentence(sentence) for sentence in sentences]
 
-    # Calculate and sort cosine similarities for embeddings
+    # calculate and sort cosine similarities for embeddings
     support = []
     for ref, sentence, tfidf_vector, word2vec_vector in zip(references, sentences, tfidf_vectors, word2vec_vectors):
         support.append({
@@ -51,12 +85,12 @@ def generate_support_from_claim(sample, keep_n=8, min_threshold=0.40, min_exampl
                 "word2vec": 0.0 if np.isnan(np.min(word2vec_vector)) else float(1 - spatial.distance.cosine(word2vec_vectors[-1], word2vec_vector))
             }
         })
-    # Calculate overall similarity (mean of cosine similarities)
+    # calculate overall similarity (mean of cosine similarities)
     for s in support:
         s["score"] = float(np.mean(list(s["scores"].values()), axis=0))
     support.pop() # remove the claim sentence itself from support
 
-    # Sort or get nlargest
+    # sort or get nlargest
     if keep_n:
         support = heapq.nlargest(keep_n, support, key=lambda x: x["score"])
         support = sorted(support, key=lambda x: x["score"], reverse=True)
@@ -64,70 +98,8 @@ def generate_support_from_claim(sample, keep_n=8, min_threshold=0.40, min_exampl
     else:
         support = sorted(support, key=lambda x: x["score"], reverse=True)
 
-    # Update and return sample
-    sample["support"] = support
-    return sample
+    return support
 
 
 def load_word2vec(word2vec_path):
     return gensim.models.KeyedVectors.load_word2vec_format(word2vec_path, binary=True)
-
-
-def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1):
-    # Make articles_data global
-    global articles_data
-    articles_data = _articles_data
-
-    # Load and globalize word2vec model
-    _logger.info("... loading word2vec model ...")
-    global word2vec_model
-    word2vec_model = load_word2vec(word2vec_path)
-
-    # Multiprocessing
-    pool = multiprocessing.Pool(nproc)
-
-    # Generate support for each claim
-    _logger.info("... generating support ...")
-    samples = []
-    for sample in tqdm(pool.imap_unordered(generate_support_from_claim, data), total=len(data)):
-        samples.append(sample)
-
-    return samples
-
-
-def main(data_path, articles_dir, output_fpath, word2vec_path, keep_n, nproc, ngpu):
-    ## Preproccess
-    data, articles = preprocess(data_path, articles_dir, nproc)
-
-    ## Create Examples
-    samples = generate_support(data, articles, word2vec_path, keep_n, nproc)
-    examples = []
-    for sample in samples:
-        for support in sample["support"]:
-            examples.append({
-                "text": sample["claim"] + " " + support["text"],
-                "id": sample["id"]
-            })
-
-    ## Predict
-    _logger.info("... saving examples to dataframe ...")
-    df = pd.DataFrame.from_records(examples)
-    df.to_csv(output_fpath)
-
-
-if __name__ == "__main__":
-    import argparse
-    import pandas as pd
-    from preprocess import preprocess
-
-    parser = argparse.ArgumentParser("Predict true, partly true, or false, for fake news data.")
-    parser.add_argument("--data_path", type=str)
-    parser.add_argument("--articles_dir", type=str)
-    parser.add_argument("--output_fpath", type=str)
-    parser.add_argument("--word2vec_path", type=str)
-    parser.add_argument("--keep_n", type=int)
-    parser.add_argument("--nproc", type=int)
-    parser.add_argument("--ngpu", type=int)
-
-    args = parser.parse_args()
-    main(**args.__dict__)

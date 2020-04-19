@@ -10,6 +10,7 @@ _logger = logging.getLogger(__name__)
 
 
 def load_params(params_fpath, nproc=1, ngpu=0, eval_batch_size=None):
+    """Loads the model parameters from a config file."""
     with open(params_fpath, 'r') as fi:
         params = json.load(fi)
     params['process_count'] = nproc
@@ -20,11 +21,13 @@ def load_params(params_fpath, nproc=1, ngpu=0, eval_batch_size=None):
 
 
 def load_model(model_dir, model_name, model_args):
+    """Loads the model from a saved checkpoint."""
     _logger.info("... loading model ...")
     return TransformerModel(model_name, model_dir, num_labels=3, args=model_args)
 
 
 def predict_proba(examples_text, claim_ids, model):
+    """Returns the prediction probabilities for a batch of examples."""
     _logger.info("... predicting ...")
     model_outputs = model.predict(examples_text)
 
@@ -35,6 +38,8 @@ def predict_proba(examples_text, claim_ids, model):
     averaged_probs = {k: np.mean(v, axis=0) for k,v in probs.items()}
     return averaged_probs
 
+
 def predict(examples_text, claim_ids, model):
+    """Returns the prediction for a batch of examples."""
     probs = predict_proba(examples_text, claim_ids, model)
     return {k: np.argmax(v) for k,v in probs.items()}
