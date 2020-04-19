@@ -102,10 +102,6 @@ def generate_support(sample, articles, word2vec_model, keep_n=8, min_threshold=0
     return support
 
 
-def load_word2vec(word2vec_path):
-    return gensim.models.KeyedVectors.load_word2vec_format(word2vec_path, binary=True)
-
-
 def split_sentences(text):
     """Returns the input text split into a list of sentences."""
     return [sentence.strip() for sentence in nltk.tokenize.sent_tokenize(text)]

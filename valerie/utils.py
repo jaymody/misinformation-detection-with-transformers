@@ -23,3 +23,7 @@ def get_logger(logfile=None):
         logger.handlers.append(fh)
 
     return logger
+
+
+def load_word2vec(word2vec_path):
+    return gensim.models.KeyedVectors.load_word2vec_format(word2vec_path, binary=True)
