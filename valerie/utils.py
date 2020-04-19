@@ -28,4 +28,5 @@ def get_logger(logfile=None):
 
 
 def load_word2vec(word2vec_path):
+    _logger.info("... loading word2vec model ...")
     return gensim.models.KeyedVectors.load_word2vec_format(word2vec_path, binary=True)
