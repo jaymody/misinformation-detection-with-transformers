@@ -1,17 +1,15 @@
-#### Setup ####
-# Python Standard Library
+"""Main script."""
 import logging
 import argparse
 
-# Third Party Packages
 import pandas as pd
 
-# Project Imports
 from preprocess import preprocess
 from generate_support import generate_support
 from predict import load_params, load_model, predict
 
-# CLI
+_logger = logging.getLogger(__name__)
+
 parser = argparse.ArgumentParser("Predict true, partly true, or false, for fake news data.")
 parser.add_argument("--data_path", type=str)
 parser.add_argument("--articles_dir", type=str)
@@ -23,17 +21,7 @@ parser.add_argument("--keep_n", type=int)
 parser.add_argument("--nproc", type=int)
 parser.add_argument("--ngpu", type=int)
 
-# Logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(levelname)s:%(name)s: %(asctime)s: %(message)s')
-sh = logging.StreamHandler()
-sh.setLevel(logging.INFO)
-sh.setFormatter(formatter)
-logger.handlers = [sh]
 
-
-#### Main ####
 def main(data_path, articles_dir, predictions_fpath, model_dir, params_fpath, word2vec_path, keep_n, nproc, ngpu):
     ## Preproccess
     data, articles = preprocess(data_path, articles_dir, nproc)
@@ -65,7 +53,6 @@ def main(data_path, articles_dir, predictions_fpath, model_dir, params_fpath, wo
     logger.info("DONE main()")
 
 
-#### Main Call ####
 if __name__ == "__main__":
     args = parser.parse_args()
     main(**args.__dict__)

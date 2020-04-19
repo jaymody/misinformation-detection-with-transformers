@@ -1,24 +1,14 @@
-#### Setup ####
-# Python Standard Library
+"""Predict given preprocessed data and trained model."""
 import json
 import logging
 import collections
 
-# Third Party Packages
 import numpy as np
 from simpletransformers.model import TransformerModel
 
-# Logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(levelname)s:%(name)s: %(asctime)s: %(message)s')
-sh = logging.StreamHandler()
-sh.setLevel(logging.INFO)
-sh.setFormatter(formatter)
-logger.handlers = [sh]
+_logger = logging.getLogger(__name__)
 
 
-#### Model ####
 def load_params(params_fpath, nproc=1, ngpu=0, eval_batch_size=None):
     with open(params_fpath, 'r') as fi:
         params = json.load(fi)
@@ -28,14 +18,14 @@ def load_params(params_fpath, nproc=1, ngpu=0, eval_batch_size=None):
         params['eval_batch_size'] = eval_batch_size
     return params
 
+
 def load_model(model_dir, model_args):
-    logger.info("... loading model ...")
+    _logger.info("... loading model ...")
     return TransformerModel('roberta', model_dir, num_labels=3, args=model_args)
 
 
-#### Predict ####
 def predict_proba(examples_text, claim_ids, model):
-    logger.info("... predicting ...")
+    _logger.info("... predicting ...")
     model_outputs = model.predict(examples_text)
 
     probs = collections.defaultdict(list)
@@ -50,7 +40,6 @@ def predict(examples_text, claim_ids, model):
     return {k: np.argmax(v) for k,v in probs.items()}
 
 
-### Main ###
 def main(data_path, predictions_fpath, model_dir, params_fpath, nproc, ngpu):
     ## Load Model
     model_args = load_params(params_fpath, nproc=nproc, ngpu=ngpu)
@@ -64,10 +53,9 @@ def main(data_path, predictions_fpath, model_dir, params_fpath, nproc, ngpu):
     with open(predictions_fpath, 'w', encoding="utf-8") as fo:
         for claim_id, prediction in predictions.items():
             fo.write("%d,%d\n" % (claim_id, prediction))
-    logger.info("... wrote predictions to {} ...".format(predictions_fpath))
+    _logger.info("... wrote predictions to {} ...".format(predictions_fpath))
 
 
-### Main Call ###
 if __name__ == "__main__":
     # Main Imports
     import argparse

@@ -1,11 +1,9 @@
-#### Setup ####
-# Python Standard Library
+"""Generate supporting metadata for sentence pair selection."""
 import gc
 import heapq
 import logging
 import multiprocessing
 
-# Third Party Packages
 import nltk
 import gensim
 import numpy as np
@@ -14,17 +12,9 @@ from scipy import spatial
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-# Logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter('%(levelname)s:%(name)s: %(asctime)s: %(message)s')
-sh = logging.StreamHandler()
-sh.setLevel(logging.INFO)
-sh.setFormatter(formatter)
-logger.handlers = [sh]
+_logger = logging.getLogger(__name__)
 
 
-#### Create Support for Single Claim ####
 def generate_support_from_claim(sample, keep_n=8, min_threshold=0.40, min_examples=4):
     # Get sentences from related_articles
     corpus = [(ref,sentence) for ref in sample["related_articles"] for sentence in articles_data[str(ref)]]
@@ -78,18 +68,18 @@ def generate_support_from_claim(sample, keep_n=8, min_threshold=0.40, min_exampl
     sample["support"] = support
     return sample
 
-#### Load word2vec Model ####
+
 def load_word2vec(word2vec_path):
     return gensim.models.KeyedVectors.load_word2vec_format(word2vec_path, binary=True)
 
-#### Create Support for All Data ####
+
 def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1):
     # Make articles_data global
     global articles_data
     articles_data = _articles_data
 
     # Load and globalize word2vec model
-    logger.info("... loading word2vec model ...")
+    _logger.info("... loading word2vec model ...")
     global word2vec_model
     word2vec_model = load_word2vec(word2vec_path)
 
@@ -97,7 +87,7 @@ def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1):
     pool = multiprocessing.Pool(nproc)
 
     # Generate support for each claim
-    logger.info("... generating support ...")
+    _logger.info("... generating support ...")
     samples = []
     for sample in tqdm(pool.imap_unordered(generate_support_from_claim, data), total=len(data)):
         samples.append(sample)
@@ -105,7 +95,6 @@ def generate_support(data, _articles_data, word2vec_path, keep_n=5, nproc=1):
     return samples
 
 
-### Main ###
 def main(data_path, articles_dir, output_fpath, word2vec_path, keep_n, nproc, ngpu):
     ## Preproccess
     data, articles = preprocess(data_path, articles_dir, nproc)
@@ -121,19 +110,16 @@ def main(data_path, articles_dir, output_fpath, word2vec_path, keep_n, nproc, ng
             })
 
     ## Predict
-    logger.info("... saving examples to dataframe ...")
+    _logger.info("... saving examples to dataframe ...")
     df = pd.DataFrame.from_records(examples)
     df.to_csv(output_fpath)
 
 
-### Main Call ###
 if __name__ == "__main__":
-    # Main Imports
     import argparse
     import pandas as pd
     from preprocess import preprocess
 
-    # CLI
     parser = argparse.ArgumentParser("Predict true, partly true, or false, for fake news data.")
     parser.add_argument("--data_path", type=str)
     parser.add_argument("--articles_dir", type=str)
