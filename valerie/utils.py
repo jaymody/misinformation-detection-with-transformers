@@ -1,6 +1,8 @@
 """Utility functions."""
 import logging
 
+import gensim
+
 _logger = logging.getLogger(__name__)
 
 
