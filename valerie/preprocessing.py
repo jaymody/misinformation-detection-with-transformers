@@ -52,7 +52,7 @@ def generate_support(sample, articles, word2vec_model, keep_n=8, min_threshold=0
         Returns the generated nlp metadata.
     """
     # get sentences from related_articles
-    corpus = [(ref,sentence) for ref in sample["related_articles"] for sentence in articles_data[str(ref)]]
+    corpus = [(ref,sentence) for ref in sample["related_articles"] for sentence in articles[str(ref)]]
     references, sentences = map(list, zip(*corpus))
 
     # append and pad claim sentence
