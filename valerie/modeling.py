@@ -26,6 +26,43 @@ from transformers import (
 _logger = logging.getLogger(__name__)
 
 
+class InputExample:
+    """A single training/test example for simple sequence classification."""
+
+    def __init__(self, guid, text_a, text_b=None, label=None):
+        """Constructor for `InputExample`.
+
+        Parameters
+        ----------
+        guid : int
+            Unique id for the example.
+        text_a : str
+            The untokenized text of the first sequence. For single
+            sequence tasks, only this sequence must be specified.
+        text_b : str, optional
+            The untokenized text of the second sequence. Only must be specified
+            for sequence pair tasks.
+        label : str, optional
+            The label of the example. This should be specified for train and
+            dev examples, but not for test examples.
+        """
+        self.guid = guid
+        self.text_a = text_a
+        self.text_b = text_b
+        self.label = label
+
+
+class InputFeatures:
+    """A single set of features of data."""
+
+    def __init__(self, input_ids, input_mask, segment_ids, label_id):
+        """Constructor for `InputFeatures`."""
+        self.input_ids = input_ids
+        self.input_mask = input_mask
+        self.segment_ids = segment_ids
+        self.label_id = label_id
+
+
 def train(examples,
         output_dir,
         pretrained_model_name_or_path,
