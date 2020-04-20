@@ -103,14 +103,13 @@ def train(examples,
     device = _get_device(use_cuda, cuda_device)
     model.to(device)
 
-    #############################################
-    ########## load and cache examples ##########
-    #############################################
+    # convert examples to features
+    features = _convert_examples_to_features(examples, tokenizer, config)
 
     # dataloader
     dataloader = DataLoader(
-        examples,
-        sampler=RandomSampler(examples), # random sampler vs shufle=True?
+        features,
+        sampler=RandomSampler(features), # random sampler vs shufle=True?
         batch_size=batch_size
     )
 
@@ -196,8 +195,8 @@ def train(examples,
                 start_step_in_epoch -= 1
                 continue
 
-            batch = (example.to(device) for example in batch)
-            inputs = _get_inputs_dict(model.base_model_prefix, batch)
+            batch = (feature.to(device) for feature in batch)
+            inputs = _convert_features_to_inputs(model.base_model_prefix, batch)
             outputs = model(**inputs)
 
             loss = outputs[0]
@@ -265,14 +264,13 @@ def predict(examples,
     device = _get_device(use_cuda, cuda_device)
     model.to(device)
 
-    #############################################
-    ########## load and cache examples ##########
-    #############################################
+    # convert examples to features
+    features = _convert_examples_to_features(examples, tokenizer, config)
 
     # data loader
     dataloader = DataLoader(
-        examples,
-        sampler = SequentialSampler(examples),
+        features,
+        sampler = SequentialSampler(features),
         batch_size = batch_size
     )
 
@@ -281,10 +279,10 @@ def predict(examples,
     probs = []
     model.eval()
     for batch in tqdm(dataloader):
-        batch = (example.to(device) for example in batch)
+        batch = (feature.to(device) for feature in batch)
 
         with torch.no_grad():
-            inputs = _get_inputs_dict(model.base_model_prefix, batch)
+            inputs = _convert_features_to_inputs(model.base_model_prefix, batch)
 
             outputs = model(**inputs)
             tmp_eval_loss, logits = outputs[:2]
@@ -301,12 +299,23 @@ def _save_model(output_dir, optimizer, scheduler, model):
     pass
 
 
-def _get_inputs_dict(base_model_prefix, batch):
+def _convert_examples_to_features(examples, tokenizer, config):
+    features = []
+    for example in examples:
+        encoding = tokenizer.encode_plus(example.text_a, example.text_b)
+        features.append(InputFeatures(
+            **encoding,
+            label_id = config["label2id"][example.label] if isinstance(example.label, "str") else example.label,
+        ))
+    return features
+
+
+def _convert_features_to_inputs(base_model_prefix, batch):
     inputs = {"input_ids": batch[0], "attention_mask": batch[1], "labels": batch[3]}
 
-    # XLM, DistilBERT and RoBERTa don't use segment_ids
+    # XLM, DistilBERT, RoBERTa, and XLM-RoBERTa don't use segment_ids
     if base_model_prefix != "distilbert":
-        inputs["token_type_ids"] = batch[2] if base_model_prefix in {"bert", "xlnet", "albert"} else None
+        inputs["token_type_ids"] = batch[2] if base_model_prefix in ["bert", "xlnet", "albert"] else None
 
     return inputs
 
