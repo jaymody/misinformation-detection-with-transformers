@@ -279,9 +279,9 @@ def _get_device(use_cuda, cuda_device):
     if use_cuda:
         if torch.cuda.is_available():
             if cuda_device == -1:
-                return torch.device("cuda")
+                return torch.device("cuda") #pylint: disable=no-member
             else:
-                return torch.device(f"cuda:{cuda_device}")
+                return torch.device(f"cuda:{cuda_device}") #pylint: disable=no-member
         else:
             raise ValueError("'use_cuda' set to True when cuda is unavailable.")
     else:
