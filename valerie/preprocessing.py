@@ -1,4 +1,5 @@
 """Preprocessors."""
+import nltk
 import heapq
 import logging
 
