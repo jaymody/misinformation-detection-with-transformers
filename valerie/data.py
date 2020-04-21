@@ -9,6 +9,20 @@ from . import utils
 _logger = logging.getLogger(__name__)
 
 
+class Claim:
+    """A claim."""
+
+    def __init__(self, id, text, claimant=None, label=None, date=None, related_articles=None, support=None):
+        """Constructor for Claim."""
+        self.id = id
+        self.text = text
+        self.claimant = claimant
+        self.label = label
+        self.data = date
+        self.related_articles = related_articles
+        self.support = support
+
+
 class Article:
     """An article."""
 
