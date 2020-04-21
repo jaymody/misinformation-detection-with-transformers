@@ -15,7 +15,7 @@ class Claim:
     def __init__(self, id, text, claimant=None, label=None, date=None, related_articles=None, support=None):
         """Constructor for Claim."""
         self.id = id
-        self.text = text
+        self.text = utils.clean_text(text)
         self.claimant = claimant
         self.label = label
         self.data = date
