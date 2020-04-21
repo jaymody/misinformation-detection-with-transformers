@@ -1,4 +1,5 @@
 """Defines structs for high-level data types."""
+import os
 import logging
 
 import bs4
@@ -20,15 +21,21 @@ class Article:
         self.date = date
 
     @classmethod
-    def from_txt(cls, id, filepath, **kwargs):
+    def from_txt(cls, filepath, **kwargs):
         """Construct an Article given a text file."""
+        if "id" not in kwargs:
+            id = os.path.splitext[os.path.basename(filepath)][0]
+
         with open(filepath, 'r') as fi:
             text = utils.clean_text(fi.read())
             return cls(id, body=text, **kwargs)
 
     @classmethod
-    def from_html(cls, id, filepath, **kwargs):
+    def from_html(cls, filepath, **kwargs):
         """Constructs an Article given an html file."""
+        if "id" not in kwargs:
+            id = os.path.splitext[os.path.basename(filepath)][0]
+
         with open(filepath, 'r') as fi:
             html = fi.read()
 
