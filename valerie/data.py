@@ -12,14 +12,15 @@ _logger = logging.getLogger(__name__)
 class Claim:
     """A claim."""
 
-    def __init__(self, id, text, claimant=None, label=None, date=None, related_articles=None, support=None):
+    def __init__(self, id, claim, claimant=None, label=None, date=None, related_articles=None, explanation=None, support=None):
         """Constructor for Claim."""
         self.id = id
-        self.text = utils.clean_text(text)
+        self.claim = utils.clean_text(claim)
         self.claimant = claimant
         self.label = label
         self.data = date
         self.related_articles = related_articles
+        self.explanation = explanation
         self.support = support
 
 
