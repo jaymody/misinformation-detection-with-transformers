@@ -11,7 +11,7 @@ _logger = logging.getLogger(__name__)
 class Article:
     """An article."""
 
-    def __init__(self, id, body=None, title=None, source=None, date=None):
+    def __init__(self, id, body=None, title=None, source=None, author=None, url=None, date=None):
         """Constructor for Article."""
         self.id = id
         self.title = title
@@ -20,24 +20,18 @@ class Article:
         self.date = date
 
     @classmethod
-    def from_txt(cls, filepath, id, **kwargs):
+    def from_txt(cls, id, filepath, **kwargs):
+        """Construct an Article given a text file."""
         with open(filepath, 'r') as fi:
             text = utils.clean_text(fi.read())
             return cls(id, body=text, **kwargs)
 
-
-class WebArticle(Article):
-    """An online article."""
-
-    def __init__(self, id, url=None, author=None, **kwargs):
-        """Constructor for WebArticle."""
-        self.url = url
-        self.author = author
-        super().__init__(id, **kwargs)
-
     @classmethod
-    def from_html(cls, id, html, **kwargs):
-        """Create a WebArticle object from an html text file."""
+    def from_html(cls, id, filepath, **kwargs):
+        """Constructs an Article given an html file."""
+        with open(filepath, 'r') as fi:
+            html = fi.read()
+
         def tag_visible(element):
             whitelist = ["h1", "h2", "h3", "h4", "h5", "body", "p", "font"]
             if element.parent.name not in whitelist:
