@@ -182,6 +182,9 @@ def train(examples,
         "adam_epsilon": adam_epsilon,
         "max_grad_norm": max_grad_norm,
     })
+    tb_writer.add_graph(model)
+    tb_writer.add_histogram("sequence_lengths", [len(feature.input_ids) for feature in features])
+    tb_writer.add_histogram("label_counts", [feature.label_id for feature in features])
 
     # training loop
     epoch_iterator = tqdm(range(start_epoch, n_epochs), desc="epoch")
