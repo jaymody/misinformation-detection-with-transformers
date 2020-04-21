@@ -238,7 +238,7 @@ def train(examples,
             # save checkpoint
             if save_steps and global_step % save_steps == 0:
                 output_dir = os.path.join(output_dir, "checkpoint-{}".format(global_step))
-                _save_model(output_dir, optimizer, scheduler, model=model)
+                _save_model(output_dir, model, tokenizer)
 
             #############################################
             ########## add early stopping here ##########
@@ -295,8 +295,14 @@ def predict(examples,
     return eval_loss, probs, preds
 
 
-def _save_model(output_dir, optimizer, scheduler, model):
-    pass
+def _save_model(output_dir, model, tokenizer):
+    os.mkdir(output_dir, exist_ok=True)
+
+    # take care of parallel training
+    model_to_save = model.module if hasattr(model, "module") else model
+    model_to_save.save_pretrained(output_dir)
+
+    tokenizer.save_pretrained(output_dir)
 
 
 def _convert_examples_to_features(examples, tokenizer, config):
