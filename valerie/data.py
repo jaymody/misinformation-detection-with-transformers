@@ -1,4 +1,4 @@
-"""Defines structs for high-level data types."""
+"""Data classes."""
 import os
 import logging
 

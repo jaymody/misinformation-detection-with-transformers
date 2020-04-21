@@ -1,4 +1,4 @@
-"""Sequence classification modeling functions."""
+"""Modeling for sequence classification using transformers."""
 import os
 import math
 import json
