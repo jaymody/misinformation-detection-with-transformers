@@ -5,9 +5,7 @@ data/
 legal/
 info/
 models/
-run_test
-run_submission
-run_vm
+run_*
 todo.txt
 _*.ipynb
 

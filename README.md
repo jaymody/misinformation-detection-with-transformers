@@ -1,2 +1,2 @@
-# Project Valerie
-Leaders prize 2019
+# Valerie
+Detecting misinformation.
