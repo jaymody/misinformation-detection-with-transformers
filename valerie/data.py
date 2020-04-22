@@ -36,24 +36,14 @@ class Article:
         self.date = date
 
     @classmethod
-    def from_txt(cls, filepath, **kwargs):
-        """Construct an Article given a text file."""
-        if "id" not in kwargs:
-            id = os.path.splitext[os.path.basename(filepath)][0]
-
-        with open(filepath, 'r') as fi:
-            text = utils.clean_text(fi.read())
-            return cls(body=text, **kwargs)
+    def from_txt(cls, text, **kwargs):
+        """Construct an Article given text."""
+        text = utils.clean_text(text)
+        return cls(body=text, **kwargs)
 
     @classmethod
-    def from_html(cls, filepath, **kwargs):
-        """Constructs an Article given an html file."""
-        if "id" not in kwargs:
-            id = os.path.splitext[os.path.basename(filepath)][0]
-
-        with open(filepath, 'r') as fi:
-            html = fi.read()
-
+    def from_html(cls, html, **kwargs):
+        """Constructs an Article given an html text."""
         def tag_visible(element):
             whitelist = ["h1", "h2", "h3", "h4", "h5", "body", "p", "font"]
             if element.parent.name not in whitelist:
@@ -72,6 +62,7 @@ class Article:
             if t and len(t) > 32: # dissallow empty/short text sequences
                 text += t + " "
 
-        title = soup.title if soup.title and soup.title.string else None
-        title = utils.clean_text(title.string) if title else None
+        if "title" not in kwargs:
+            title = soup.title if soup.title and soup.title.string else None
+            title = utils.clean_text(title.string) if title else None
         return cls(body=text, title=title , **kwargs)
