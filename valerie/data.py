@@ -43,7 +43,7 @@ class Article:
 
         with open(filepath, 'r') as fi:
             text = utils.clean_text(fi.read())
-            return cls(id, body=text, **kwargs)
+            return cls(body=text, **kwargs)
 
     @classmethod
     def from_html(cls, filepath, **kwargs):
@@ -72,5 +72,6 @@ class Article:
             if t and len(t) > 32: # dissallow empty/short text sequences
                 text += t + " "
 
-        title = utils.clean_text(soup.title.string) if soup.title else None
-        return cls(id, body=text, title=title , **kwargs)
+        title = soup.title if soup.title and soup.title.string else None
+        title = utils.clean_text(title.string) if title else None
+        return cls(body=text, title=title , **kwargs)
