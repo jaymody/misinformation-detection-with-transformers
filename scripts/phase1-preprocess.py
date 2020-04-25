@@ -30,13 +30,14 @@ def visit(claim):
 def generate_examples(claims_file, articles_dir, examples_file, word2vec_file, keep_n, min_threshold, min_examples, nproc):
     _logger.info("... loading claims from {} ...".format(claims_file))
     with open(claims_file, 'r') as fi:
-        claims = [Claim(**d) for d in tqdm(json.load(fi))]
+        claims = [Claim.from_dict(d) for d in tqdm(json.load(fi))]
 
     _logger.info("... loading articles from {} ...".format(articles_dir))
     articles = {}
     for filepath in tqdm(glob.glob(os.path.join(articles_dir, "*.txt"))):
-        article_id = os.path.splitext(os.path.basename(filepath))[0]
-        articles[article_id] = {Article.from_txt(filepath, id=article_id)}
+        with open(filepath) as fi:
+            article_id = int(os.path.splitext(os.path.basename(filepath))[0])
+            articles[article_id] = Article.from_txt(article_id, fi.read())
 
     _logger.info("... initializing preprocessor ...")
     preprocessor = ClaimPreprocessor(articles, word2vec_file)
@@ -49,11 +50,11 @@ def generate_examples(claims_file, articles_dir, examples_file, word2vec_file, k
     all_examples = []
     pool = multiprocessing.Pool(nproc)
     for examples in tqdm(pool.imap_unordered(visit, claims), total=len(claims)):
-        all_examples.append(examples)
+        all_examples.extend(examples)
 
     _logger.info("... saving examples to {} ...".format(examples_file))
     with open(examples_file, 'w') as fo:
-        json.dump({example.__dict__ for example in examples}, fo)
+        json.dump([example.__dict__ for example in all_examples], fo)
 
 
 if __name__ == "__main__":
@@ -68,5 +69,5 @@ if __name__ == "__main__":
     parser.add_argument("--nproc", type=int)
 
     kwargs = parser.parse_args()
-    generate_examples(**kwargs)
+    generate_examples(**kwargs.__dict__)
 

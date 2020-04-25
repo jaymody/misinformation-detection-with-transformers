@@ -23,26 +23,33 @@ class Claim:
         self.explanation = explanation
         self.support = support
 
+    @classmethod
+    def from_dict(cls, d):
+        if "id" in d:
+            _id = d.pop("id")
+            return cls(_id, **d)
+        return cls(**d)
+
 
 class Article:
     """An article."""
 
-    def __init__(self, id, body=None, title=None, source=None, author=None, url=None, date=None):
+    def __init__(self, id, content=None, title=None, source=None, author=None, url=None, date=None):
         """Constructor for Article."""
         self.id = id
         self.title = title
-        self.body = body
+        self.content = content
         self.source = source
         self.date = date
 
     @classmethod
-    def from_txt(cls, text, **kwargs):
+    def from_txt(cls, id, text, **kwargs):
         """Construct an Article given text."""
         text = utils.clean_text(text)
-        return cls(body=text, **kwargs)
+        return cls(id, content=text, **kwargs)
 
     @classmethod
-    def from_html(cls, html, **kwargs):
+    def from_html(cls, id, html, **kwargs):
         """Constructs an Article given an html text."""
         def tag_visible(element):
             whitelist = ["h1", "h2", "h3", "h4", "h5", "body", "p", "font"]
@@ -65,4 +72,4 @@ class Article:
         if "title" not in kwargs:
             title = soup.title if soup.title and soup.title.string else None
             title = utils.clean_text(title.string) if title else None
-        return cls(body=text, title=title , **kwargs)
+        return cls(id, content=text, title=title , **kwargs)

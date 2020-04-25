@@ -62,20 +62,18 @@ class ClaimPreprocessor:
             (score, text, articles id).
         """
         # get sentences from related_articles
-        corpus = [(ref,sentence) for ref in claim.related_articles for sentence in utils.split_sentences(self.articles[ref].body)]
+        corpus = [(ref,sentence) for ref in claim.related_articles for sentence in utils.split_sentences(self.articles[ref].content)]
         references, sentences = map(list, zip(*corpus))
 
         # append and pad claim sentence
-        sentences.append(claim)
+        sentences.append(claim.claim)
         references.append(None)
 
         # get tf_idf vectors
-        _logger.info("... generating tdidf vectors ...")
         tfidf_vectorizer = TfidfVectorizer()
         tfidf_vectors = tfidf_vectorizer.fit_transform(sentences)
 
         # get sentence word2vec vectors
-        _logger.info("... fetching word2vec embeddings ...")
         def word2vec_sentence(sentence):
             words = nltk.tokenize.word_tokenize(sentence)
             vectors = []
@@ -88,7 +86,6 @@ class ClaimPreprocessor:
         word2vec_vectors = [word2vec_sentence(sentence) for sentence in sentences]
 
         # calculate and sort cosine similarities for embeddings
-        _logger.info("... computing cosine similarity scores ...")
         support = []
         for ref, sentence, tfidf_vector, word2vec_vector in zip(references, sentences, tfidf_vectors, word2vec_vectors):
             tfidf_score = float(cosine_similarity(tfidf_vectors[-1], tfidf_vector))
@@ -100,7 +97,7 @@ class ClaimPreprocessor:
                     "tfidf": tfidf_score,
                     "word2vec": word2vec_score
                 },
-                "score": float(sum(tfidf_score, word2vec_score)) / 2
+                "score": float(sum([tfidf_score, word2vec_score])) / 2
             })
         support.pop() # remove the claim sentence itself from support
 
