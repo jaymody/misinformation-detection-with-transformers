@@ -183,7 +183,7 @@ def train(examples,
         "adam_epsilon": adam_epsilon,
         "max_grad_norm": max_grad_norm,
     }, {})
-    _, input_to_model = _convert_features_to_inputs(model.base_model_prefix, next(iter(dataLoader)))
+    _, input_to_model = _convert_features_to_inputs(model.base_model_prefix, next(iter(dataloader)))
     tb_writer.add_graph(model, input_to_model)
     tb_writer.add_histogram("sequence_lengths", np.array([len(feature.input_ids) for feature in features]))
     tb_writer.add_histogram("label_counts", np.array([feature.label for feature in features]))
