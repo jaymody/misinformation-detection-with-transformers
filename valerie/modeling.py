@@ -8,9 +8,9 @@ import logging
 import multiprocessing
 
 import torch
+import numpy as np
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score, f1_score
-import numpy as np
 
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data.distributed import DistributedSampler
@@ -183,9 +183,10 @@ def train(examples,
         "adam_epsilon": adam_epsilon,
         "max_grad_norm": max_grad_norm,
     }, {})
-    tb_writer.add_graph(model)
-    tb_writer.add_histogram("sequence_lengths", [len(feature.input_ids) for feature in features])
-    tb_writer.add_histogram("label_counts", [feature.label for feature in features])
+    _, input_to_model = _convert_features_to_inputs(model.base_model_prefix, next(iter(dataLoader)))
+    tb_writer.add_graph(model, input_to_model)
+    tb_writer.add_histogram("sequence_lengths", np.array([len(feature.input_ids) for feature in features]))
+    tb_writer.add_histogram("label_counts", np.array([feature.label for feature in features]))
 
     # training loop
     epoch_iterator = tqdm(range(start_epoch, n_epochs), desc="epoch")
