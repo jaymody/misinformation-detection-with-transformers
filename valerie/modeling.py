@@ -314,7 +314,7 @@ def _convert_examples_to_features(examples, tokenizer, config):
         encoding = tokenizer.encode_plus(example.text_a, example.text_b)
         features.append(InputFeatures(
             **encoding,
-            label_id = config["label2id"][example.label] if isinstance(example.label, str) else example.label,
+            label_id = config["label2id"][example.label] if isinstance(example.label, type(str)) else example.label,
         ))
     return features
 
