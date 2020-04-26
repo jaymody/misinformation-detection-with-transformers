@@ -84,10 +84,10 @@ def train(examples,
         n_epochs=1,
         weight_decay=0,
         warmup_steps=0,
-        warmup_ratio=0,
-        learning_rate=0,
-        adam_epsilon=0,
-        max_grad_norm=0):
+        warmup_ratio=0.06,
+        learning_rate=4e-5,
+        adam_epsilon=1e-8,
+        max_grad_norm=1.0):
     # check that output dir exists
     if not os.path.exists(output_dir):
         raise ValueError("output_dir ({}) does not exist".format(output_dir))
