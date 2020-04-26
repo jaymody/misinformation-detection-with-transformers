@@ -55,10 +55,10 @@ class InputExample:
 class InputFeatures:
     """A single set of features of data."""
 
-    def __init__(self, input_ids, input_mask, token_type_ids, label):
+    def __init__(self, input_ids, attention_mask, token_type_ids, label):
         """Constructor for `InputFeatures`."""
         input_ids = input_ids
-        input_mask = input_mask
+        attention_mask = attention_mask
         token_type_ids = token_type_ids
         label = label
 
