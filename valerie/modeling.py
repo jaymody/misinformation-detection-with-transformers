@@ -182,7 +182,7 @@ def train(examples,
         "learning_rate": learning_rate,
         "adam_epsilon": adam_epsilon,
         "max_grad_norm": max_grad_norm,
-    })
+    }, {})
     tb_writer.add_graph(model)
     tb_writer.add_histogram("sequence_lengths", [len(feature.input_ids) for feature in features])
     tb_writer.add_histogram("label_counts", [feature.label for feature in features])
