@@ -55,12 +55,12 @@ class InputExample:
 class InputFeatures:
     """A single set of features of data."""
 
-    def __init__(self, input_ids, input_mask, segment_ids, label_id):
+    def __init__(self, input_ids, input_mask, token_type_ids, label):
         """Constructor for `InputFeatures`."""
-        self.input_ids = input_ids
-        self.input_mask = input_mask
-        self.segment_ids = segment_ids
-        self.label_id = label_id
+        input_ids = input_ids
+        input_mask = input_mask
+        token_type_ids = token_type_ids
+        label = label
 
 
 def train(examples,
@@ -184,7 +184,7 @@ def train(examples,
     })
     tb_writer.add_graph(model)
     tb_writer.add_histogram("sequence_lengths", [len(feature.input_ids) for feature in features])
-    tb_writer.add_histogram("label_counts", [feature.label_id for feature in features])
+    tb_writer.add_histogram("label_counts", [feature.label for feature in features])
 
     # training loop
     epoch_iterator = tqdm(range(start_epoch, n_epochs), desc="epoch")
@@ -312,11 +312,9 @@ def _save_model(output_dir, model, tokenizer):
 def _convert_examples_to_features(examples, tokenizer, config):
     features = []
     for example in examples:
-        encoding = tokenizer.encode_plus(example.text_a, example.text_b)
-        features.append(InputFeatures(
-            **encoding,
-            label_id = config["label2id"][example.label] if isinstance(example.label, type(str)) else example.label,
-        ))
+        inputs = tokenizer.encode_plus(example.text_a, example.text_b)
+        label = config["label2id"][example.label] if isinstance(example.label, str) else example.label
+        features.append(InputFeatures(**inputs, label=label))
     return features
 
 
