@@ -247,6 +247,7 @@ def train(examples,
             ########## add early stopping here ##########
             #############################################
 
+    tb_writer.close()
     return global_step, tr_loss / global_step
 
 
