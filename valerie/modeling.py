@@ -12,6 +12,7 @@ from tqdm import tqdm
 from sklearn.metrics import accuracy_score, f1_score
 import numpy as np
 
+from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data.distributed import DistributedSampler
 from torch.utils.data import DataLoader, RandomSampler, SequentialSampler, TensorDataset
 
@@ -170,7 +171,7 @@ def train(examples,
             _logger.info("   Will skip the first %d steps in the current epoch", start_step_in_epoch)
 
     # tensorboard
-    tb_writer = torch.utils.tensorboard.SummaryWriter(log_dir)
+    tb_writer = SummaryWriter(log_dir)
     tb_writer.add_hparams({
         "batch_size": batch_size,
         "gradient_accumulation_steps": gradient_accumulation_steps,
