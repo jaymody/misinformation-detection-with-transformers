@@ -48,9 +48,9 @@ class BasicDataset(Dataset):
     def convert_examples_to_features(self, examples, nproc):
         all_features = []
         all_inputs = [(self, example) for example in examples]
-        pool = multiprocessing.Pool(nproc)
-        for features in tqdm(pool.imap(self.convert_example_to_features, all_inputs, chunksize=512), total=len(all_inputs)):
-            all_features.append(features)
+        with multiprocessing.Pool(nproc) as pool:
+            for features in tqdm(pool.imap(self.convert_example_to_features, all_inputs, chunksize=512), total=len(all_inputs)):
+                all_features.append(features)
         return all_features
 
     def save(self, cached_features_file):
