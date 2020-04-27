@@ -1,36 +1,77 @@
 """Preprocessors."""
-import nltk
 import heapq
 import logging
+import multiprocessing
 
+import nltk
 import numpy as np
+from tqdm import tqdm
 from scipy import spatial
+from transformers import InputExample
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from . import utils
-from . import modeling
 
 _logger = logging.getLogger(__name__)
 
 
-class ClaimPreprocessor:
-    """Preprocessor for Claims."""
+class MultiClaimSupportProcessor:
+    """Processor for multiple claim support pair examples."""
 
-    def __init__(self, articles, word2vec_path):
+    def __init__(self, articles, word2vec_file, keep_n=8, min_threshold=0.40, min_examples=4, nproc=1):
         """Constructor for ClaimPreprocessor.
 
         Parameters
         ----------
+        train_claims : list of Claim
+            Training claims.
+        dev_claims : list of Claim
+            Dev claims.
         articles : dict of (id, Article)
             Dict of id to Article.
-        word2vec_path : str
+        word2vec_file : str
             Path to saved word2vec model file.
+        keep_n : int
+            Max number of related sentences to keep.
+        min_threshold : float
+            Minimum score (between 0 and 1) the claim-sentence pair must be
+            achieved to be included in the output (after `min_examples` examples
+            have been chosen).
+        min_examples : int
+            Minimum number of examples to include in the output.
+        nproc : int
+            Number of processors to use.
         """
         self.articles = articles
-        self.word2vec_model = utils.load_word2vec(word2vec_path)
+        self.word2vec_model = utils.load_word2vec(word2vec_file)
+        self.keep_n = keep_n
+        self.min_threshold = 0.40
+        self.min_examples = min_examples
+        self.nproc = nproc
 
-    def generate_support(self, claim, keep_n=8, min_threshold=0.40, min_examples=4):
+    def get_labels(self):
+        """See base class."""
+        return [0,1,2]
+
+    def generate_examples(self, claims):
+        """Gets`InputExample`s for a set of claims."""
+        examples = []
+        pool = multiprocessing.Pool(self.nproc)
+        for claim, support in tqdm(pool.imap_unordered(self._visit, claims), total=len(claims)):
+            for s in support:
+                examples.append(InputExample(
+                    guid=claim.id,
+                    text_a=claim.claim,
+                    text_b=s["text"],
+                    label=claim.label
+                ))
+        return examples
+
+    def _visit(self, claim):
+        return claim, self._generate_support(claim)
+
+    def _generate_support(self, claim):
         """Finds sentences related to the claim using related articles.
 
         Finds related sentences to the claim from it's list of related articles
@@ -46,14 +87,6 @@ class ClaimPreprocessor:
         ----------
         claim : str
             A Claim.
-        keep_n : int
-            Max number of related sentences to keep.
-        min_threshold : float
-            Minimum score (between 0 and 1) the claim-sentence pair must be
-            achieved to be included in the output (after `min_examples` examples
-            have been chosen).
-        min_examples : int
-            Minimum number of examples to include in the output.
 
         Returns
         -------
@@ -62,7 +95,11 @@ class ClaimPreprocessor:
             (score, text, articles id).
         """
         # get sentences from related_articles
-        corpus = [(ref,sentence) for ref in claim.related_articles for sentence in utils.split_sentences(self.articles[ref].content)]
+        corpus = [
+            (ref,sentence)
+            for ref in claim.related_articles
+            for sentence in utils.split_sentences(self.articles[ref].content)
+        ]
         references, sentences = map(list, zip(*corpus))
 
         # append and pad claim sentence
@@ -102,10 +139,10 @@ class ClaimPreprocessor:
         support.pop() # remove the claim sentence itself from support
 
         # sort and get nlargest
-        if keep_n:
-            support = heapq.nlargest(keep_n, support, key=lambda x: x["score"])
+        if self.keep_n:
+            support = heapq.nlargest(self.keep_n, support, key=lambda x: x["score"])
             support = sorted(support, key=lambda x: x["score"], reverse=True)
-            support = [s for i,s in enumerate(support) if s["score"] >= min_threshold or i < min_examples]
+            support = [s for i,s in enumerate(support) if s["score"] >= self.min_threshold or i < self.min_examples]
         else:
             support = sorted(support, key=lambda x: x["score"], reverse=True)
 
