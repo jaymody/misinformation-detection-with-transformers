@@ -1,7 +1,5 @@
-import time
 import logging
 import multiprocessing
-from dataclasses import dataclass, field
 
 import torch
 from tqdm import tqdm
@@ -15,7 +13,6 @@ class BasicDataset(Dataset):
     """Basic Dataset."""
 
     def __init__(self, examples, tokenizer, label_list=[], output_mode="classification", nproc=1, cached_features_file=None):
-        self.nproc = nproc
         self.tokenizer = tokenizer
         self.output_mode = output_mode
         self.max_length = tokenizer.max_len
@@ -25,7 +22,7 @@ class BasicDataset(Dataset):
             self.features = torch.load(cached_features_file)
         else:
             _logger.info("... converting examples to features ...")
-            self.features = self.convert_examples_to_features(examples)
+            self.features = self.convert_examples_to_features(examples, nproc)
 
     def label_from_example(self, example):
         if example.label == None:
@@ -36,14 +33,9 @@ class BasicDataset(Dataset):
             return float(example.label)
         raise KeyError(self.output_mode)
 
-    def convert_examples_to_features(self, examples):
-        all_features = []
-        pool = multiprocessing.Pool(self.nproc)
-        for features in tqdm(pool.map(self._convert_example_to_features, examples), total=len(examples)):
-            all_features.append(features)
-        return all_features
-
-    def _convert_example_to_features(self, example):
+    @staticmethod
+    def convert_example_to_features(_input):
+        self, example = _input
         inputs = self.tokenizer.encode_plus(
             example.text_a,
             example.text_b,
@@ -52,6 +44,14 @@ class BasicDataset(Dataset):
         )
         label = self.label_from_example(example)
         return InputFeatures(**inputs, label=label)
+
+    def convert_examples_to_features(self, examples, nproc):
+        all_features = []
+        all_inputs = [(self, example) for example in examples]
+        pool = multiprocessing.Pool(nproc)
+        for features in tqdm(pool.imap(self.convert_example_to_features, all_inputs, chunksize=512), total=len(all_inputs)):
+            all_features.append(features)
+        return all_features
 
     def save(self, cached_features_file):
         _logger.info(f".. saving features to cached file %s", cached_features_file)

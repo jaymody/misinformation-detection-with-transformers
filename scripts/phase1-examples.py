@@ -2,6 +2,7 @@ import os
 import json
 import glob
 import argparse
+import multiprocessing
 
 from tqdm import tqdm
 
@@ -19,14 +20,24 @@ def load_claims(claims_file):
     return claims
 
 
-def load_articles(articles_dir):
+def load_articles(articles_dir, nproc):
     _logger.info("... loading articles from %s ...", articles_dir)
     articles = {}
-    for filepath in tqdm(glob.glob(os.path.join(articles_dir, "*.txt"))):
-        with open(filepath) as fi:
-            article_id = int(os.path.splitext(os.path.basename(filepath))[0])
-            articles[article_id] = Article.from_txt(article_id, fi.read())
+    filepaths = glob.glob(os.path.join(articles_dir, "*.txt"))
+    with multiprocessing.Pool(nproc) as pool:
+        articles = {
+            article_id: article
+            for article_id, article in
+            tqdm(pool.imap_unordered(_load_article, filepaths), total=len(filepaths))
+        }
     return articles
+
+
+def _load_article(filepath):
+    with open(filepath) as fi:
+        article_id = int(os.path.splitext(os.path.basename(filepath))[0])
+        article = Article.from_txt(article_id, fi.read())
+    return article_id, article
 
 
 def load_processor(articles, word2vec_file, keep_n, min_threshold, min_examples, nproc):
@@ -42,13 +53,26 @@ def load_processor(articles, word2vec_file, keep_n, min_threshold, min_examples,
     return processor
 
 
-def generate_examples(claims, processor):
+def generate_examples(claims, processor, nproc):
     _logger.info("... generating examples ...")
-    examples = processor.generate_examples(claims)
+
+    _inputs = [[claim] for claim in claims]
+    globals()["_proc"] = processor
+    all_examples = []
+
+    with multiprocessing.Pool(nproc) as pool:
+        for examples in tqdm(pool.imap_unordered(_generate_examples, _inputs), total=len(_inputs)):
+            all_examples.extend(examples)
+
+    globals()["_proc"] = None
     return examples
 
 
-def generate_train_test_examples(claims, processor, train_test_split_ratio=0.9):
+def _generate_examples(claims):
+    return _proc.generate_examples(claims) #pylint: disable=undefined-variable
+
+
+def generate_train_test_examples(claims, processor, train_test_split_ratio, nproc):
     split_num = int(len(claims) * train_test_split_ratio)
     train_claims, test_claims = claims[:split_num], claims[split_num:]
 
@@ -58,10 +82,10 @@ def generate_train_test_examples(claims, processor, train_test_split_ratio=0.9):
     _logger.info("    num_testing_claims = %d ...", len(test_claims))
 
     _logger.info("... generating train examples ...")
-    train_examples = processor.generate_examples(train_claims)
+    train_examples = generate_examples(train_claims, processor, nproc)
 
     _logger.info("... generating test examples ...")
-    test_examples = processor.generate_examples(test_claims)
+    test_examples = generate_examples(test_claims, processor, nproc)
 
     _logger.info("    num_total_examples = %d ...", len(train_examples+test_examples))
     _logger.info(" num_training_examples = %d ...", len(train_examples))
@@ -84,7 +108,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     claims = load_claims(args.claims_file)
-    articles = load_articles(args.articles_dir)
+    articles = load_articles(args.articles_dir, args.nproc)
     processor = load_processor(
         articles,
         args.word2vec_file,
@@ -95,12 +119,17 @@ if __name__ == "__main__":
     )
 
     if args.train_test_split_ratio is None:
-        examples = generate_examples(claims, processor)
+        examples = generate_examples(claims, processor, args.nproc)
         _logger.info("... saving examples to %s ...", args.examples_file)
         with open(args.examples_file, 'w') as fo:
             json.dump([example.__dict__ for example in examples], fo)
     else:
-        train_examples, test_examples = generate_train_test_examples(claims, processor, args.train_test_split_ratio)
+        train_examples, test_examples = generate_train_test_examples(
+            claims,
+            processor,
+            args.train_test_split_ratio,
+            args.nproc
+        )
         _logger.info("... saving examples to %s ...", args.examples_file)
         with open(args.examples_file, 'w') as fo:
             json.dump({
