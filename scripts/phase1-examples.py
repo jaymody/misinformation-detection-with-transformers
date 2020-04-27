@@ -84,7 +84,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     claims = load_claims(args.claims_file)
-    articles = load_claims(args.articles_dir)
+    articles = load_articles(args.articles_dir)
     processor = load_processor(
         articles,
         args.word2vec_file,
