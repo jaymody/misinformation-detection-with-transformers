@@ -2,7 +2,6 @@
 import heapq
 import logging
 import threading
-import multiprocessing
 
 import nltk
 import numpy as np
@@ -16,8 +15,6 @@ from . import utils
 
 _logger = logging.getLogger(__name__)
 
-_process_this = None
-_process_this_lock = threading.Lock()
 
 class MultiClaimSupportProcessor:
     """Processor for multiple claim support pair examples."""
@@ -70,34 +67,6 @@ class MultiClaimSupportProcessor:
                     label=claim.label
                 ))
         return examples
-
-    # def generate_examples(self, claims):
-    #     """Gets`InputExample`s for a set of claims."""
-    #     with _process_this_lock:
-    #         global _process_this
-    #         _process_this = (self, claims)
-    #         with multiprocessing.Pool(self.nproc) as pool:
-    #             examples = list(tqdm(pool.imap(
-    #                 self._generate_examples, range(len(claims)), chunksize=100),
-    #             total=len(claims)))
-    #     # flatten examples list
-    #     examples = [e for example in examples for e in example]
-    #     return examples
-
-    # @staticmethod
-    # def _generate_examples(claim_index):
-    #     processor, claims = _process_this
-    #     claim = claims[claim_index]
-
-    #     support = processor._generate_support(claim)
-    #     examples = [InputExample(
-    #         guid=claim.id,
-    #         text_a=claim.claim,
-    #         text_b=s["text"],
-    #         label=claim.label
-    #     ) for s in support]
-
-    #     return examples
 
     def _generate_support(self, claim):
         """Finds sentences related to the claim using related articles.
