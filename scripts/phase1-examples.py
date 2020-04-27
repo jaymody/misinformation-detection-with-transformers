@@ -65,7 +65,7 @@ def generate_examples(claims, processor, nproc):
             all_examples.extend(examples)
 
     globals()["_proc"] = None
-    return examples
+    return all_examples
 
 
 def _generate_examples(claims):
