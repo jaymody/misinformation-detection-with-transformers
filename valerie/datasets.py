@@ -18,7 +18,7 @@ class BasicDataset(Dataset):
         self.max_length = tokenizer.max_len
         self.label_map = {label: i for i, label in enumerate(label_list)}
         if cached_features_file:
-            _logger.info(f"... loading features from cached file %s", cached_features_file)
+            _logger.info(f"... loading features from cached file %s ...", cached_features_file)
             self.features = torch.load(cached_features_file)
         else:
             _logger.info("... converting examples to features ...")
@@ -54,7 +54,7 @@ class BasicDataset(Dataset):
         return all_features
 
     def save(self, cached_features_file):
-        _logger.info(f".. saving features to cached file %s", cached_features_file)
+        _logger.info(f".. saving features to cached file %s ...", cached_features_file)
         torch.save(self.features, cached_features_file)
 
     def  __len__(self):
