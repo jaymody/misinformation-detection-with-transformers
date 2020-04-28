@@ -1,37 +1,33 @@
-FROM nvidia/cuda:10.0-base-ubuntu18.04
+FROM nvidia/cuda:10.1-cudnn7-runtime-ubuntu18.04
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-         build-essential \
-         cmake \
-         git \
-         curl \
-         ca-certificates \
-         libjpeg-dev \
-         libpng-dev && \
-     rm -rf /var/lib/apt/lists/*
+RUN apt update && \
+    apt install -y bash \
+        build-essential \
+        git \
+        curl \
+        ca-certificates \
+        libjpeg-dev \
+        libpng-dev \
+        python3 \
+        python3-pip && \
+    rm -rf /var/lib/apt/lists
 
-RUN curl -o ~/miniconda.sh -O  https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh  && \
-     chmod +x ~/miniconda.sh && \
-     ~/miniconda.sh -b -p /opt/conda && \
-     rm ~/miniconda.sh && \
-     /opt/conda/bin/conda install -y python=3.7 && \
-     /opt/conda/bin/conda clean -afy && \
-     ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
-     echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
-     echo "conda activate base" >> ~/.bashrc
-
-ENV PATH /opt/conda/bin:$PATH
-RUN /bin/bash -c "source activate base"
+RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -m pip install --no-cache-dir \
+        mkl \
+        torch \
+        scikit-learn \
+        scipy \
+        tqdm \
+        nltk \
+        bs4 \
+        requests \
+        gensim && \
+    python3 -m pip install --no-cache-dir git+https://github.com/huggingface/transformers && \
+    python3 -m pip install --no-cache-dir . && \
+    python3 -m nltk.downloader punkt
 
 WORKDIR /usr/src/
-ADD . /usr/src
+COPY . /usr/src/
 
-RUN conda install pytorch cudatoolkit=10.0 -c pytorch && \
-    conda install scikit-learn tqdm nltk pandas && \
-    conda clean -afy
-
-RUN pip install bs4 tensorboardx transformers gensim && \
-    pip install -e /usr/src/ && \
-    python -m nltk.downloader punkt
-
-CMD [ "bash", "/usr/src/run" ]
+CMD ["/bin/bash/run"]
