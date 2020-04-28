@@ -25,7 +25,7 @@ def load_examples(examples_file):
     return examples
 
 
-def generate_predictions(examples, pretrained_model_name_or_path, batch_size, ngpu, nproc):
+def generate_predictions(examples, pretrained_model_name_or_path, batch_size, nproc):
     _logger.info("... loading config, tokenizer, and model from %s ...", pretrained_model_name_or_path)
     config = AutoConfig.from_pretrained(pretrained_model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
@@ -61,7 +61,6 @@ if __name__ == "__main__":
     parser.add_argument("--predictions_file", type=str)
     parser.add_argument("--pretrained_model_name_or_path", type=str)
     parser.add_argument("--batch_size", type=int)
-    parser.add_argument("--ngpu", type=int)
 
     args = parser.parse_args()
     examples = load_examples(args.examples_file)
@@ -69,7 +68,6 @@ if __name__ == "__main__":
         examples,
         args.pretrained_model_name_or_path,
         args.batch_size,
-        args.ngpu,
         args.nproc
     )
 

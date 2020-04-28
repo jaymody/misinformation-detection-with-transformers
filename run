@@ -8,7 +8,7 @@ PREDICTIONS_FILE="/usr/local/predictions.txt"
 WORD2VEC_FILE="${SRC_DIR}/models/GoogleNews-vectors-negative300.bin"
 PRETRAINED_MODEL_NAME_OR_PATH="${SRC_DIR}/models/transformer/"
 
-python ${SRC_DIR}/phase1-preprocess.py \
+python3 ${SRC_DIR}/phase1-examples.py \
     --claims_file ${DATA_PATH} \
     --articles_dir ${ARTICLES_DIR} \
     --examples_file ${EXAMPLES_FILE} \
@@ -18,11 +18,8 @@ python ${SRC_DIR}/phase1-preprocess.py \
     --min_exmaples 4 \
     --nproc 4
 
-python ${SRC_DIR}/phase1-predict.py \
+python3 ${SRC_DIR}/phase1-predict.py \
     --examples_file ${EXAMPLES_FILE} \
     --predictions_file ${PREDICTIONS_FILE} \
     --pretrained_model_name_or_path ${PRETRAINED_MODEL_NAME_OR_PATH} \
-    --use_cuda \
-    --cuda_device -1 \
     --batch_size 4 \
-    --ngpu 1
