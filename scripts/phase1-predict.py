@@ -34,9 +34,8 @@ def generate_predictions(examples, pretrained_model_name_or_path, batch_size, ng
     _logger.info("... loading dataset ...")
     predict_dataset = BasicDataset(examples, tokenizer, [0,1,2], nproc=nproc)
     predict_args = TrainingArguments(
-        eval_batch_size=batch_size,
-        n_gpu=ngpu,
-        do_predict=True,
+        output_dir="./",
+        per_gpu_eval_batch_size=batch_size,
     )
 
     _logger.info("... loading trainer ...")
@@ -78,4 +77,3 @@ if __name__ == "__main__":
     with open(args.predictions_file, 'w') as fo:
         for claim_id, pred in predictions.items():
             fo.write("%d,%d\n" % (claim_id, pred))
-
