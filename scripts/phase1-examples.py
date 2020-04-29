@@ -40,15 +40,14 @@ def _load_article(filepath):
     return article_id, article
 
 
-def load_processor(articles, word2vec_file, keep_n, min_threshold, min_examples, nproc):
+def load_processor(articles, word2vec_file, min_examples, max_examples, min_threshold, nproc):
     _logger.info("... loading processor ...")
     processor = MultiClaimSupportProcessor(
         articles=articles,
         word2vec_file=word2vec_file,
-        keep_n=keep_n,
-        min_threshold=min_threshold,
         min_examples=min_examples,
-        nproc=nproc
+        max_examples=max_examples,
+        min_threshold=min_threshold,
     )
     return processor
 
@@ -100,9 +99,9 @@ if __name__ == "__main__":
     parser.add_argument("--articles_dir", type=str)
     parser.add_argument("--word2vec_file", type=str)
     parser.add_argument("--examples_file", type=str)
-    parser.add_argument("--keep_n", type=int)
-    parser.add_argument("--min_threshold", type=float)
     parser.add_argument("--min_examples", type=int)
+    parser.add_argument("--max_examples", type=int)
+    parser.add_argument("--min_threshold", type=float)
     parser.add_argument("--nproc", type=int)
     parser.add_argument("--train_test_split_ratio", type=float, default=None)
 
@@ -112,9 +111,9 @@ if __name__ == "__main__":
     processor = load_processor(
         articles,
         args.word2vec_file,
-        args.keep_n,
-        args.min_threshold,
         args.min_examples,
+        args.max_examples,
+        args.min_threshold,
         args.nproc
     )
 

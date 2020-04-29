@@ -19,7 +19,7 @@ _logger = logging.getLogger(__name__)
 class MultiClaimSupportProcessor:
     """Processor for multiple claim support pair examples."""
 
-    def __init__(self, articles, word2vec_file, keep_n=8, min_threshold=0.40, min_examples=4, nproc=1):
+    def __init__(self, articles, word2vec_file,  min_examples=4, max_examples=8, min_threshold=0.40):
         """Constructor for ClaimPreprocessor.
 
         Parameters
@@ -32,23 +32,20 @@ class MultiClaimSupportProcessor:
             Dict of id to Article.
         word2vec_file : str
             Path to saved word2vec model file.
-        keep_n : int
-            Max number of related sentences to keep.
+        min_examples : int
+            Minimum number of examples to include in the output.
+        max_examples : int
+            Max number of related sentences to include in the output.
         min_threshold : float
             Minimum score (between 0 and 1) the claim-sentence pair must be
             achieved to be included in the output (after `min_examples` examples
             have been chosen).
-        min_examples : int
-            Minimum number of examples to include in the output.
-        nproc : int
-            Number of processors to use.
         """
         self.articles = articles
         self.word2vec_model = utils.load_word2vec(word2vec_file)
-        self.keep_n = keep_n
-        self.min_threshold = 0.40
         self.min_examples = min_examples
-        self.nproc = nproc
+        self.max_examples = max_examples
+        self.min_threshold = 0.40
 
     def get_labels(self):
         """See base class."""
@@ -92,16 +89,22 @@ class MultiClaimSupportProcessor:
             (score, text, articles id).
         """
         # get sentences from related_articles
-        corpus = [
+        document = [
             (ref,sentence)
             for ref in claim.related_articles
             for sentence in utils.split_sentences(self.articles[ref].content)
         ]
-        references, sentences = map(list, zip(*corpus))
+        references, sentences = map(list, zip(*document))
+
+        # restrict the number of sentences allowed to be processed to 256
+        # long documents will bog down computation times
+        # (255 since we append the claim itself, making it 256)
+        # references = references[:255]
+        # sentences = sentences[:255]
 
         # append and pad claim sentence
-        sentences.append(claim.claim)
-        references.append(None)
+        # sentences.append(claim.claim)
+        # references.append(None)
 
         # get tf_idf vectors
         tfidf_vectorizer = TfidfVectorizer()
@@ -122,6 +125,11 @@ class MultiClaimSupportProcessor:
         # calculate and sort cosine similarities for embeddings
         support = []
         for ref, sentence, tfidf_vector, word2vec_vector in zip(references, sentences, tfidf_vectors, word2vec_vectors):
+            # we use two different cosine functions since the tf_idf vectors are
+            # sparse (so scipy.distance won't work on them, we are forced to use
+            # sklearn), and the word2vec vectors are of shape (embedding_size)
+            # so we can use scipy without having to reshape the vectors (and scipy
+            # is faster at computing the similarity score)
             tfidf_score = float(cosine_similarity(tfidf_vectors[-1], tfidf_vector))
             word2vec_score = 0.0 if np.isnan(np.min(word2vec_vector)) else float(1 - spatial.distance.cosine(word2vec_vectors[-1], word2vec_vector))
             support.append({
@@ -135,12 +143,38 @@ class MultiClaimSupportProcessor:
             })
         support.pop() # remove the claim sentence itself from support
 
-        # sort and get nlargest
-        if self.keep_n:
-            support = heapq.nlargest(self.keep_n, support, key=lambda x: x["score"])
-            support = sorted(support, key=lambda x: x["score"], reverse=True)
+        if self.max_examples:
+            support = heapq.nlargest(self.max_examples, support, key=lambda x: x["score"])
             support = [s for i,s in enumerate(support) if s["score"] >= self.min_threshold or i < self.min_examples]
         else:
             support = sorted(support, key=lambda x: x["score"], reverse=True)
 
         return support
+
+
+class SingleClaimSupportProcessor(MultiClaimSupportProcessor):
+    """Processor for single claim support pair examples."""
+
+    def __init__(self, articles, word2vec_file, min_examples=3, max_examples=5, min_threshold=0.50):
+        """See SingleClaimSupportProcessor."""
+        super.__init__(articles, word2vec_file, max_examples, min_threshold, min_examples)
+
+    def generate_example(self, claim):
+        support = self._generate_support(claim)
+
+        support_text = ""
+        for s in support:
+            support_text += s["text"] + " "
+        support_text.strip()
+
+        example = InputExample(
+            guid=claim.id,
+            text_a=claim.claim,
+            text_b=support_text,
+            label=claim.label
+        )
+        return example
+
+    def generate_examples(self, claims):
+        examples = [self.generate_example(claim) for claim in claims]
+        return examples

@@ -4,6 +4,7 @@ import logging
 import unicodedata
 
 import gensim
+from scipy import spatial
 
 _logger = logging.getLogger(__name__)
 
