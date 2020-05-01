@@ -31,10 +31,10 @@ class DataArguments():
     """Data arguments."""
 
     examples_file: str
-    cached_train_features_file: str
-    cached_test_features_file: str
-    train_test_split_ratio: float
-    random_state: int
+    cached_train_features_file: str = None
+    cached_test_features_file: str = None
+    train_size: float = 0.95
+    random_state: int = None
 
 
 def get_args_files(output_dir):
@@ -193,10 +193,10 @@ def train(output_dir,
     else:
         training_examples = load_examples(data_args.examples_file)
         testing_examples = None
-        if data_args.train_test_split_ratio:
+        if data_args.train_size:
             training_examples, testing_examples = train_test_split(
                 training_examples,
-                train_size=args.train_size,
+                train_size=data_args.train_size,
                 random_state=data_args.random_state
             )
             test_dataset = BasicDataset(
