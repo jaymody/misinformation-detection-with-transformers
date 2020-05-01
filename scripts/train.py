@@ -96,12 +96,12 @@ def train_test_split(examples, train_size=0.95, random_state=None):
     labels = [example[0].label for example in _examples]
     train_index, test_index = list(sss.split(_examples, labels))[0]
 
-    training_examples = _examples[train_index]
+    training_examples = [_examples[idx] for idx in train_index]
     num_training_claims = len(training_examples)
     training_examples = [example for example_list in training_examples for example in example_list]
     num_training_examples = len(training_examples)
 
-    testing_examples = _examples[test_index]
+    testing_examples = [_examples[idx] for idx in test_index]
     num_testing_claims = len(testing_examples)
     testing_examples = [example for example_list in testing_examples for example in example_list]
     num_testing_examples = len(testing_examples)
