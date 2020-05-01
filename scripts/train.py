@@ -211,7 +211,7 @@ def train(output_dir,
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser("Generate phase1 examples.")
+    parser = argparse.ArgumentParser("Train sequence classifier.")
     parser.add_argument("--output_dir", type=str)
     parser.add_argument("--pretrained_model_name_or_path", type=str)
     parser.add_argument("--config_args_file", type=str)
