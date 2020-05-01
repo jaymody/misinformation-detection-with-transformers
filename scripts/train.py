@@ -25,6 +25,7 @@ from valerie.datasets import BasicDataset
 
 _logger = get_logger()
 
+
 @dataclass
 class DataArguments():
     """Data arguments."""
@@ -59,23 +60,30 @@ def load_examples(examples_file):
     return examples
 
 
-def train_test_split(examples, train_test_split_ratio=0.95):
+def train_test_split(examples, train_size=0.95, random_state=None):
     _examples = collections.defaultdict(list)
     for example in tqdm(examples):
         _examples[example.guid].append(example)
+    _examples = list(_examples.values())
 
     num_total_claims = len(_examples)
     num_total_examples = len(examples)
-    assert len(examples) == sum([len(example) for example in _examples.values()])
+    assert len(examples) == sum([len(example) for example in _examples])
 
-    split_num = int(len(_examples) * train_test_split_ratio)
+    sss = StratifiedShuffleSplit(
+        n_splits=1,
+        train_size=train_size,
+        random_state=random_state
+    )
+    labels = [example[0].label for example in _examples]
+    train_index, test_index = list(sss.split(_examples, labels))[0]
 
-    training_examples = list(_examples.values())[:split_num]
+    training_examples = _examples[train_index]
     num_training_claims = len(training_examples)
     training_examples = [example for example_list in training_examples for example in example_list]
     num_training_examples = len(training_examples)
 
-    testing_examples = list(_examples.values())[split_num:]
+    testing_examples = _examples[test_index]
     num_testing_claims = len(testing_examples)
     testing_examples = [example for example_list in testing_examples for example in example_list]
     num_testing_examples = len(testing_examples)
@@ -188,7 +196,8 @@ def train(output_dir,
         if data_args.train_test_split_ratio:
             training_examples, testing_examples = train_test_split(
                 training_examples,
-                train_test_split_ratio=args.train_test_split_ratio
+                test_size=args.train_size,
+                random_state=data_args.random_state
             )
             test_dataset = BasicDataset(
                 testing_examples,
