@@ -113,6 +113,12 @@ def train_test_split(examples, train_size=0.95, random_state=None):
     _logger.info("Num Total Examples:\t%d", num_total_examples)
     _logger.info("Num Training Examples:\t%d", num_training_examples)
     _logger.info("Num Testing Examples:\t%d", num_testing_examples)
+    _logger.info("")
+
+    train_labels_count = collections.Counter([labels[idx] for idx in train_index])
+    test_labels_count = collections.Counter([labels[idx] for idx in test_index])
+    _logger.info("Train Labels Count:\t%s", str(dict(train_labels_count)))
+    _logger.info("Test Labels Count:\t%s", str(dict(test_labels_count)))
 
     return training_examples, testing_examples
 
