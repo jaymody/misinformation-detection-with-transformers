@@ -3,6 +3,7 @@ import json
 import random
 import argparse
 import collections
+from dataclasses import dataclass
 
 import torch
 import numpy as np
@@ -16,6 +17,7 @@ from transformers import (
     InputExample,
 )
 from sklearn.metrics import classification_report
+from sklearn.model_selection import StratifiedShuffleSplit
 from torch.utils.tensorboard import SummaryWriter
 
 from valerie.utils import get_logger
@@ -23,12 +25,22 @@ from valerie.datasets import BasicDataset
 
 _logger = get_logger()
 
+@dataclass
+class DataArguments():
+    """Data arguments."""
+
+    examples_file: str
+    cached_train_features_file: str
+    cached_test_features_file: str
+    train_test_split_ratio: float
+
 
 def get_files(output_dir):
     if not os.path.exists(output_dir):
         raise ValueError(f"output dir does not exists: {output_dir}")
 
     args_files = {
+        "data_args_file": os.path.join(output_dir, "data_args.json"),
         "config_args_file": os.path.join(output_dir, "config_args.json"),
         "tokenizer_args_file": os.path.join(output_dir, "tokenizer_args.json"),
         "model_args_file": os.path.join(output_dir, "model_args.json"),
@@ -115,15 +127,12 @@ def compute_metrics(results):
 
 def train(output_dir,
         pretrained_model_name_or_path,
+        data_args_file,
         training_args_file,
         config_args_file="",
         tokenizer_args_file="",
         model_args_file="",
         label_list=[],
-        examples_file="",
-        cached_train_features_file="",
-        cached_test_features_file="",
-        train_test_split_ratio=0.95,
         compute_metrics_fn=compute_metrics,
         nproc=1):
     """Train sequence classifier."""
@@ -140,6 +149,8 @@ def train(output_dir,
         with open(model_args_file) as fi:
             model_args = json.load(fi)
 
+    with open(data_args_file) as fi:
+        data_args = DataArguments(**json.load(fi))
     with open(training_args_file) as fi:
         training_args = TrainingArguments(output_dir=output_dir, **json.load(fi))
 
@@ -155,27 +166,30 @@ def train(output_dir,
     train_dataset = None
     test_dataset = None
     # load from cached files, else load from examples file
-    if cached_train_features_file:
+    if data_args.cached_train_features_file:
         train_dataset = BasicDataset(
             None,
             tokenizer=tokenizer,
             label_list=label_list,
             nproc=nproc,
-            cached_features_file=cached_train_features_file
+            cached_features_file=data_args.cached_train_features_file
         )
-        if cached_test_features_file:
+        if data_args.cached_test_features_file:
             test_dataset = BasicDataset(
                 None,
                 tokenizer=tokenizer,
                 label_list=label_list,
                 nproc=nproc,
-                cached_features_file=cached_test_features_file
+                cached_features_file=data_args.cached_test_features_file
             )
     else:
-        training_examples = load_examples(examples_file)
+        training_examples = load_examples(data_args.examples_file)
         testing_examples = None
-        if train_test_split_ratio:
-            training_examples, testing_examples = train_test_split(training_examples)
+        if data_args.train_test_split_ratio:
+            training_examples, testing_examples = train_test_split(
+                training_examples,
+                train_test_split_ratio=args.train_test_split_ratio
+            )
             test_dataset = BasicDataset(
                 testing_examples,
                 tokenizer=tokenizer,
@@ -232,10 +246,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("Train sequence classifier.")
     parser.add_argument("--output_dir", type=str)
     parser.add_argument("--pretrained_model_name_or_path", type=str)
-    parser.add_argument("--examples_file", type=str, default=None)
-    parser.add_argument("--cached_train_features_file", type=str, default=None)
-    parser.add_argument("--cached_test_features_file", type=str, default=None)
-    parser.add_argument("--train_test_split_ratio", type=float, default=0.95)
     parser.add_argument("--nproc", type=int, default=1)
 
     args = parser.parse_args()
