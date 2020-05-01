@@ -118,7 +118,7 @@ def train_test_split(examples, train_size=0.95, random_state=None):
     train_labels_count = collections.Counter([labels[idx] for idx in train_index])
     test_labels_count = collections.Counter([labels[idx] for idx in test_index])
     _logger.info("Train Labels Count:\t%s", str(dict(train_labels_count)))
-    _logger.info("Test Labels Count:\t%s", str(dict(test_labels_count)))
+    _logger.info("Test Labels Count:\t\t%s", str(dict(test_labels_count)))
 
     return training_examples, testing_examples
 
