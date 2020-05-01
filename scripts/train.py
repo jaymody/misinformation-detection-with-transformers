@@ -95,7 +95,8 @@ def compute_metrics(results):
     return metrics
 
 
-def train(pretrained_model_name_or_path,
+def train(output_dir,
+        pretrained_model_name_or_path,
         training_args_file,
         config_args_file="",
         tokenizer_args_file="",
@@ -122,7 +123,7 @@ def train(pretrained_model_name_or_path,
             model_args = json.load(fi)
 
     with open(training_args_file) as fi:
-        training_args = TrainingArguments(**json.load(fi))
+        training_args = TrainingArguments(output_dir=output_dir, **json.load(fi))
 
     config, tokenizer, model = from_pretrained(
         pretrained_model_name_or_path,
@@ -211,6 +212,7 @@ def train(pretrained_model_name_or_path,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Generate phase1 examples.")
+    parser.add_argument("--output_dir", type=str)
     parser.add_argument("--pretrained_model_name_or_path", type=str)
     parser.add_argument("--config_args_file", type=str)
     parser.add_argument("--tokenizer_args_file", type=str)
