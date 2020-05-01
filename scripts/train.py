@@ -1,3 +1,4 @@
+import os
 import json
 import random
 import argparse
@@ -21,6 +22,23 @@ from valerie.utils import get_logger
 from valerie.datasets import BasicDataset
 
 _logger = get_logger()
+
+
+def get_files(output_dir):
+    if not os.path.exists(output_dir):
+        raise ValueError(f"output dir does not exists: {output_dir}")
+
+    args_files = {
+        "config_args_file": os.path.join(output_dir, "config_args.json"),
+        "tokenizer_args_file": os.path.join(output_dir, "tokenizer_args.json"),
+        "model_args_file": os.path.join(output_dir, "model_args.json"),
+        "training_args_file": os.path.join(output_dir, "training_args.json"),
+    }
+    for k, v in args_files.items():
+        if not os.path.exists(v):
+            raise ValueError(f"could not find {k}: {v}")
+
+    return args_files
 
 
 def load_examples(examples_file):
@@ -214,10 +232,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser("Train sequence classifier.")
     parser.add_argument("--output_dir", type=str)
     parser.add_argument("--pretrained_model_name_or_path", type=str)
-    parser.add_argument("--config_args_file", type=str)
-    parser.add_argument("--tokenizer_args_file", type=str)
-    parser.add_argument("--model_args_file", type=str)
-    parser.add_argument("--training_args_file", type=str)
     parser.add_argument("--examples_file", type=str, default=None)
     parser.add_argument("--cached_train_features_file", type=str, default=None)
     parser.add_argument("--cached_test_features_file", type=str, default=None)
@@ -225,4 +239,5 @@ if __name__ == "__main__":
     parser.add_argument("--nproc", type=int, default=1)
 
     args = parser.parse_args()
-    train(**args.__dict__)
+    args_files = get_files(args.output_dir)
+    train(**args_files, **args.__dict__)
