@@ -166,7 +166,7 @@ def train(output_dir,
             )
 
         train_dataset = BasicDataset(
-            testing_examples,
+            training_examples,
             tokenizer=tokenizer,
             label_list=label_list,
             nproc=nproc,
