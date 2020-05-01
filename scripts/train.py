@@ -55,6 +55,23 @@ def get_args_files(output_dir):
     return args_files
 
 
+def from_pretrained(pretrained_model_name_or_path, config_args={}, tokenizer_args={}, model_args={}):
+    config = AutoConfig.from_pretrained(
+        pretrained_model_name_or_path,
+        **config_args
+    )
+    tokenizer = AutoTokenizer.from_pretrained(
+        pretrained_model_name_or_path,
+        **tokenizer_args
+    )
+    model = AutoModelForSequenceClassification.from_pretrained(
+        pretrained_model_name_or_path,
+        config=config,
+        **model_args
+    )
+    return config, tokenizer, model
+
+
 def load_examples(examples_file):
     with open(examples_file) as fi:
         examples = [InputExample(**example) for example in json.load(fi)]
@@ -98,24 +115,6 @@ def train_test_split(examples, train_size=0.95, random_state=None):
     _logger.info("Num Testing Examples:\t%d", num_testing_examples)
 
     return training_examples, testing_examples
-
-
-def from_pretrained(pretrained_model_name_or_path, config_args={}, tokenizer_args={}, model_args={}):
-    config = AutoConfig.from_pretrained(
-        pretrained_model_name_or_path,
-        **config_args
-    )
-    tokenizer = AutoTokenizer.from_pretrained(
-        pretrained_model_name_or_path,
-        **tokenizer_args
-    )
-    model = AutoModelForSequenceClassification.from_pretrained(
-        pretrained_model_name_or_path,
-        config=config,
-        **model_args
-    )
-
-    return config, tokenizer, model
 
 
 def compute_metrics(results):
