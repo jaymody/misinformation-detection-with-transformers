@@ -34,9 +34,10 @@ class DataArguments():
     cached_train_features_file: str
     cached_test_features_file: str
     train_test_split_ratio: float
+    random_state: int
 
 
-def get_files(output_dir):
+def get_args_files(output_dir):
     if not os.path.exists(output_dir):
         raise ValueError(f"output dir does not exists: {output_dir}")
 
@@ -196,7 +197,7 @@ def train(output_dir,
         if data_args.train_test_split_ratio:
             training_examples, testing_examples = train_test_split(
                 training_examples,
-                test_size=args.train_size,
+                train_size=args.train_size,
                 random_state=data_args.random_state
             )
             test_dataset = BasicDataset(
@@ -258,5 +259,5 @@ if __name__ == "__main__":
     parser.add_argument("--nproc", type=int, default=1)
 
     args = parser.parse_args()
-    args_files = get_files(args.output_dir)
+    args_files = get_args_files(args.output_dir)
     train(**args_files, **args.__dict__)
