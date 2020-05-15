@@ -40,6 +40,8 @@ class Article:
         self.title = title
         self.content = content
         self.source = source
+        self.author = author
+        self.url = url
         self.date = date
 
     @classmethod
