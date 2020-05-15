@@ -8,6 +8,7 @@ models/
 run_*
 todo.txt
 _*.ipynb
+.envrc
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
