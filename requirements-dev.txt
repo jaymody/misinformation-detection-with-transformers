@@ -105,4 +105,5 @@ wcwidth==0.1.9
 webencodings==0.5.1
 Werkzeug==1.0.1
 wrapt==1.12.1
+yapf==0.30.0
 zipp==3.1.0
