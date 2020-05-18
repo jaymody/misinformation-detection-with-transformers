@@ -18,7 +18,7 @@ class Claim:
         self.claim = utils.clean_text(claim)
         self.claimant = claimant
         self.label = label
-        self.data = date
+        self.date = date
         self.related_articles = related_articles
         self.explanation = explanation
         self.support = support
