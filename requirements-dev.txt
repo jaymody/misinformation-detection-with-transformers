@@ -98,7 +98,7 @@ torch==1.5.0
 tornado==6.0.4
 tqdm==4.45.0
 traitlets==4.3.3
--e git://github.com/jaymody/transformers.git@pass_in_tb_writer_to_trainer#egg=transformers
+-e git://github.com/huggingface/transformers#egg=transformers
 typed-ast==1.4.1
 urllib3==1.25.9
 wcwidth==0.1.9
