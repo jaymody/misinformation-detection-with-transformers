@@ -19,6 +19,7 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
         scikit-learn \
         scipy \
         tqdm \
+        pandas \
         nltk \
         bs4 \
         requests \
