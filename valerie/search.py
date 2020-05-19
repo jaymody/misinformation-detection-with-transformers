@@ -1,6 +1,7 @@
 import os
 import logging
 
+import nltk
 import requests
 
 _logger = logging.getLogger(__name__)
@@ -23,3 +24,9 @@ def query(query_string, from_idx=0):
         return resp.json()
     else:
         _logger.warning("query failed, response status is not ok")
+
+
+def enhanced_query(query_string, stopwords, from_idx=0):
+    words = nltk.tokenize.word_tokenize(query_string)
+    words = [word for word in words if word not in stopwords]
+    return query(" ".join(words), from_idx=from_idx)
