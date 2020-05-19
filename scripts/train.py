@@ -8,20 +8,15 @@ from dataclasses import dataclass
 import torch
 import numpy as np
 from tqdm import tqdm
-from transformers import (
-    AutoConfig,
-    AutoTokenizer,
-    AutoModelForSequenceClassification,
-    Trainer,
-    TrainingArguments,
-    InputExample,
-)
-from sklearn.metrics import classification_report
 from sklearn.model_selection import StratifiedShuffleSplit
-from torch.utils.tensorboard import SummaryWriter
 
 from valerie.utils import get_logger
-from valerie.datasets import BasicDataset
+from valerie.modeling import (
+    SequenceClassificationInputExample,
+    SequenceClassificationTrainingArgs,
+    SequenceClassificationDataset,
+    SequenceClassificationModel,
+)
 
 _logger = get_logger()
 
@@ -55,22 +50,11 @@ def get_args_files(output_dir):
     return args_files
 
 
-def from_pretrained(
-    pretrained_model_name_or_path, config_args={}, tokenizer_args={}, model_args={}
-):
-    config = AutoConfig.from_pretrained(pretrained_model_name_or_path, **config_args)
-    tokenizer = AutoTokenizer.from_pretrained(
-        pretrained_model_name_or_path, **tokenizer_args
-    )
-    model = AutoModelForSequenceClassification.from_pretrained(
-        pretrained_model_name_or_path, config=config, **model_args
-    )
-    return config, tokenizer, model
-
-
 def load_examples(examples_file):
     with open(examples_file) as fi:
-        examples = [InputExample(**example) for example in json.load(fi)]
+        examples = [
+            SequenceClassificationInputExample(**example) for example in json.load(fi)
+        ]
     return examples
 
 
@@ -121,22 +105,6 @@ def train_test_split(examples, train_size=0.95, random_state=None):
     return training_examples, testing_examples
 
 
-def compute_metrics(results):
-    labels = results.label_ids
-    probs = results.predictions
-    preds = [np.argmax(v) for v in probs]
-    report = classification_report(labels, preds, output_dict=True)
-
-    metrics = {}
-    metrics["accuracy"] = report.pop("accuracy")
-    metrics["f1_macro"] = report.pop("macro avg")["f1-score"]
-    metrics["f1_weighted"] = report.pop("weighted avg")["f1-score"]
-    for k, v in report.items():
-        metrics["f1_label_{}".format(k)] = v["f1-score"]
-
-    return metrics
-
-
 def train(
     output_dir,
     pretrained_model_name_or_path,
@@ -146,7 +114,6 @@ def train(
     tokenizer_args_file="",
     model_args_file="",
     label_list=[],
-    compute_metrics_fn=compute_metrics,
     nproc=1,
 ):
     """Train sequence classifier."""
@@ -166,32 +133,24 @@ def train(
     with open(data_args_file) as fi:
         data_args = DataArguments(**json.load(fi))
     with open(training_args_file) as fi:
-        training_args = TrainingArguments(output_dir=output_dir, **json.load(fi))
+        training_args = SequenceClassificationTrainingArgs(
+            output_dir=output_dir, logging_dir=output_dir, **json.load(fi)
+        )
 
-    config, tokenizer, model = from_pretrained(
+    model = SequenceClassificationModel.from_pretrained(
         pretrained_model_name_or_path, config_args, tokenizer_args, model_args
     )
-
-    label_list = label_list if label_list else list(config.label2id.values())
 
     train_dataset = None
     test_dataset = None
     # load from cached files, else load from examples file
     if data_args.cached_train_features_file:
-        train_dataset = BasicDataset(
-            None,
-            tokenizer=tokenizer,
-            label_list=label_list,
-            nproc=nproc,
-            cached_features_file=data_args.cached_train_features_file,
+        train_dataset = model.create_dataset(
+            cached_features_file=data_args.cached_train_features_file
         )
         if data_args.cached_test_features_file:
-            test_dataset = BasicDataset(
-                None,
-                tokenizer=tokenizer,
-                label_list=label_list,
-                nproc=nproc,
-                cached_features_file=data_args.cached_test_features_file,
+            test_dataset = model.create_dataset(
+                cached_features_file=data_args.cached_test_features_file
             )
     else:
         training_examples = load_examples(data_args.examples_file)
@@ -202,52 +161,16 @@ def train(
                 train_size=data_args.train_size,
                 random_state=data_args.random_state,
             )
-            test_dataset = BasicDataset(
-                testing_examples,
-                tokenizer=tokenizer,
-                label_list=label_list,
-                nproc=nproc,
-            )
+            test_dataset = model.create_dataset(examples=testing_examples, nproc=nproc)
+        train_dataset = model.create_dataset(examples=training_examples, nproc=nproc)
 
-        train_dataset = BasicDataset(
-            training_examples, tokenizer=tokenizer, label_list=label_list, nproc=nproc,
-        )
-
-    hparams_dict = {
-        "per_gpu_train_batch_size": training_args.per_gpu_train_batch_size,
-        "per_gpu_eval_batch_size": training_args.per_gpu_eval_batch_size,
-        "train_batch_size": training_args.train_batch_size,
-        "eval_batch_size": training_args.eval_batch_size,
-        "gradient_accumulation_steps": training_args.gradient_accumulation_steps,
-        "learning_rate": training_args.learning_rate,
-        "weight_decay": training_args.weight_decay,
-        "adam_epsilon": training_args.adam_epsilon,
-        "max_grad_norm": training_args.max_grad_norm,
-        "num_train_epochs": training_args.num_train_epochs,
-        "max_steps": training_args.max_steps,
-        "warmup_steps": training_args.warmup_steps,
-        "seed": training_args.seed,
-        "fp16": training_args.fp16,
-        "fp16_opt_level": training_args.fp16_opt_level,
-    }
-
-    tb_writer = SummaryWriter(log_dir=training_args.output_dir)
-    tb_writer.add_hparams(hparams_dict, {})
-    _example_input_to_model = torch.zeros(
-        [training_args.train_batch_size, tokenizer.max_len], dtype=torch.long
-    )
-    tb_writer.add_graph(model, _example_input_to_model)
-
-    trainer = Trainer(
-        model=model,
-        args=training_args,
+    # pass pretrained_model_name_or_path to continue training
+    _global_step, _tr_loss = model.train(
         train_dataset=train_dataset,
-        eval_dataset=test_dataset,
-        compute_metrics=compute_metrics,
-        tb_writer=tb_writer,
+        test_dataset=test_dataset,
+        training_args=training_args,
+        model_path=pretrained_model_name_or_path,
     )
-
-    _global_step, _tr_loss = trainer.train()
 
 
 if __name__ == "__main__":
