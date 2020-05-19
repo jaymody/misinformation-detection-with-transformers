@@ -178,3 +178,56 @@ class SingleClaimSupportProcessor(MultiClaimSupportProcessor):
     def generate_examples(self, claims):
         examples = [self.generate_example(claim) for claim in claims]
         return examples
+
+
+def generate_sentence_similarity_scores(subject, sentences, word2vec_model, avg=True):
+    """Generates similarity scores for the subject sentence against other sentences.
+
+    Scores are computed in the following steps:
+
+    1.  Compute the tfidf and word2vec embeddings for the subject and sentences.
+    2.  Take the cosine similarity between each of subject-sentence pairs
+        (one tfidf score and one word2vec score for each pair).
+    3.  Take the average of the tfidf and word2vec similarity scores
+    """
+    sentences += subject
+
+    # tfidf sentence vectors
+    tfidf_vectorizer = TfidfVectorizer(ngram_range=(1,2)) # try the stopwords option?
+    tfidf_vectors = tfidf_vectorizer.fit_transform(sentences)
+    assert len(sentences) == len(tfidf_vectors)
+
+    # word2vec sentence vectors
+    def word2vec_sentence(sentence):
+        words = nltk.tokenize.word_tokenize(sentence)
+        vectors = []
+        for word in words:
+            try:
+                vectors.append(word2vec_model[word])
+            except:
+                continue
+        return np.nan if not vectors else np.mean(vectors, axis=0)
+    word2vec_vectors = [word2vec_sentence(sentence) for sentence in sentences]
+    assert len(sentences) == len(word2vec_vectors)
+
+    # calculate and sort cosine similarity scores for each vector
+    scores = []
+    for tfidf_vector, word2vec_vector in zip(tfidf_vectors, word2vec_vectors):
+        # we use two different cosine functions since the tf_idf vectors are
+        # sparse (so scipy.distance won't work on them, we are forced to use
+        # sklearn), and the word2vec vectors are of shape (embedding_size)
+        # so we can use scipy without having to reshape the vectors (and scipy
+        # is faster at computing the similarity score)
+        tfidf_score = float(cosine_similarity(tfidf_vectors[-1], tfidf_vector))
+        word2vec_score = 0.0 if np.isnan(np.min(word2vec_vector)) else float(1 - spatial.distance.cosine(word2vec_vectors[-1], word2vec_vector))
+
+        scores.append({
+            "tfidf": tfidf_score,
+            "word2vec": word2vec_score
+        })
+    scores.pop() # remove the subject sentence itself from the scores
+
+    if avg:
+        return [sum(score.values())/len(score.values()) for score in scores]
+    else:
+        return scores
