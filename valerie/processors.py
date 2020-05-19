@@ -19,7 +19,14 @@ _logger = logging.getLogger(__name__)
 class MultiClaimSupportProcessor:
     """Processor for multiple claim support pair examples."""
 
-    def __init__(self, articles, word2vec_file,  min_examples=4, max_examples=8, min_threshold=0.40):
+    def __init__(
+        self,
+        articles,
+        word2vec_file,
+        min_examples=4,
+        max_examples=8,
+        min_threshold=0.40,
+    ):
         """Constructor for ClaimPreprocessor.
 
         Parameters
@@ -49,7 +56,7 @@ class MultiClaimSupportProcessor:
 
     def get_labels(self):
         """See base class."""
-        return [0,1,2]
+        return [0, 1, 2]
 
     def generate_examples(self, claims):
         """Gets`InputExample`s for a set of claims."""
@@ -57,12 +64,14 @@ class MultiClaimSupportProcessor:
         for claim in claims:
             support = self._generate_support(claim)
             for s in support:
-                examples.append(InputExample(
-                    guid=claim.id,
-                    text_a=claim.claim,
-                    text_b=s["text"],
-                    label=claim.label
-                ))
+                examples.append(
+                    InputExample(
+                        guid=claim.id,
+                        text_a=claim.claim,
+                        text_b=s["text"],
+                        label=claim.label,
+                    )
+                )
         return examples
 
     def _generate_support(self, claim):
@@ -90,7 +99,7 @@ class MultiClaimSupportProcessor:
         """
         # get sentences from related_articles
         document = [
-            (ref,sentence)
+            (ref, sentence)
             for ref in claim.related_articles
             for sentence in utils.split_sentences(self.articles[ref].content)
         ]
@@ -120,32 +129,46 @@ class MultiClaimSupportProcessor:
                 except:
                     continue
             return np.nan if not vectors else np.mean(vectors, axis=0)
+
         word2vec_vectors = [word2vec_sentence(sentence) for sentence in sentences]
 
         # calculate and sort cosine similarities for embeddings
         support = []
-        for ref, sentence, tfidf_vector, word2vec_vector in zip(references, sentences, tfidf_vectors, word2vec_vectors):
+        for ref, sentence, tfidf_vector, word2vec_vector in zip(
+            references, sentences, tfidf_vectors, word2vec_vectors
+        ):
             # we use two different cosine functions since the tf_idf vectors are
             # sparse (so scipy.distance won't work on them, we are forced to use
             # sklearn), and the word2vec vectors are of shape (embedding_size)
             # so we can use scipy without having to reshape the vectors (and scipy
             # is faster at computing the similarity score)
             tfidf_score = float(cosine_similarity(tfidf_vectors[-1], tfidf_vector))
-            word2vec_score = 0.0 if np.isnan(np.min(word2vec_vector)) else float(1 - spatial.distance.cosine(word2vec_vectors[-1], word2vec_vector))
-            support.append({
-                "article_id": ref,
-                "text": sentence,
-                "scores": {
-                    "tfidf": tfidf_score,
-                    "word2vec": word2vec_score
-                },
-                "score": float(sum([tfidf_score, word2vec_score])) / 2
-            })
-        support.pop() # remove the claim sentence itself from support
+            word2vec_score = (
+                0.0
+                if np.isnan(np.min(word2vec_vector))
+                else float(
+                    1 - spatial.distance.cosine(word2vec_vectors[-1], word2vec_vector)
+                )
+            )
+            support.append(
+                {
+                    "article_id": ref,
+                    "text": sentence,
+                    "scores": {"tfidf": tfidf_score, "word2vec": word2vec_score},
+                    "score": float(sum([tfidf_score, word2vec_score])) / 2,
+                }
+            )
+        support.pop()  # remove the claim sentence itself from support
 
         if self.max_examples:
-            support = heapq.nlargest(self.max_examples, support, key=lambda x: x["score"])
-            support = [s for i,s in enumerate(support) if s["score"] >= self.min_threshold or i < self.min_examples]
+            support = heapq.nlargest(
+                self.max_examples, support, key=lambda x: x["score"]
+            )
+            support = [
+                s
+                for i, s in enumerate(support)
+                if s["score"] >= self.min_threshold or i < self.min_examples
+            ]
         else:
             support = sorted(support, key=lambda x: x["score"], reverse=True)
 
@@ -155,9 +178,18 @@ class MultiClaimSupportProcessor:
 class SingleClaimSupportProcessor(MultiClaimSupportProcessor):
     """Processor for single claim support pair examples."""
 
-    def __init__(self, articles, word2vec_file, min_examples=3, max_examples=5, min_threshold=0.50):
+    def __init__(
+        self,
+        articles,
+        word2vec_file,
+        min_examples=3,
+        max_examples=5,
+        min_threshold=0.50,
+    ):
         """See SingleClaimSupportProcessor."""
-        super.__init__(articles, word2vec_file, max_examples, min_threshold, min_examples)
+        super.__init__(
+            articles, word2vec_file, max_examples, min_threshold, min_examples
+        )
 
     def generate_example(self, claim):
         support = self._generate_support(claim)
@@ -168,10 +200,7 @@ class SingleClaimSupportProcessor(MultiClaimSupportProcessor):
         support_text.strip()
 
         example = InputExample(
-            guid=claim.id,
-            text_a=claim.claim,
-            text_b=support_text,
-            label=claim.label
+            guid=claim.id, text_a=claim.claim, text_b=support_text, label=claim.label
         )
         return example
 
@@ -193,7 +222,7 @@ def generate_sentence_similarity_scores(subject, sentences, word2vec_model, avg=
     sentences += subject
 
     # tfidf sentence vectors
-    tfidf_vectorizer = TfidfVectorizer(ngram_range=(1,2)) # try the stopwords option?
+    tfidf_vectorizer = TfidfVectorizer(ngram_range=(1, 2))  # try the stopwords option?
     tfidf_vectors = tfidf_vectorizer.fit_transform(sentences)
     assert len(sentences) == len(tfidf_vectors)
 
@@ -207,6 +236,7 @@ def generate_sentence_similarity_scores(subject, sentences, word2vec_model, avg=
             except:
                 continue
         return np.nan if not vectors else np.mean(vectors, axis=0)
+
     word2vec_vectors = [word2vec_sentence(sentence) for sentence in sentences]
     assert len(sentences) == len(word2vec_vectors)
 
@@ -219,15 +249,18 @@ def generate_sentence_similarity_scores(subject, sentences, word2vec_model, avg=
         # so we can use scipy without having to reshape the vectors (and scipy
         # is faster at computing the similarity score)
         tfidf_score = float(cosine_similarity(tfidf_vectors[-1], tfidf_vector))
-        word2vec_score = 0.0 if np.isnan(np.min(word2vec_vector)) else float(1 - spatial.distance.cosine(word2vec_vectors[-1], word2vec_vector))
+        word2vec_score = (
+            0.0
+            if np.isnan(np.min(word2vec_vector))
+            else float(
+                1 - spatial.distance.cosine(word2vec_vectors[-1], word2vec_vector)
+            )
+        )
 
-        scores.append({
-            "tfidf": tfidf_score,
-            "word2vec": word2vec_score
-        })
-    scores.pop() # remove the subject sentence itself from the scores
+        scores.append({"tfidf": tfidf_score, "word2vec": word2vec_score})
+    scores.pop()  # remove the subject sentence itself from the scores
 
     if avg:
-        return [sum(score.values())/len(score.values()) for score in scores]
+        return [sum(score.values()) / len(score.values()) for score in scores]
     else:
         return scores

@@ -11,8 +11,7 @@ _logger = logging.getLogger(__name__)
 
 def get_logger(logfile=None):
     """Gets a nicely formatted logger."""
-    formatter = logging.Formatter(
-        '[%(asctime)s] %(levelname)s:%(name)s: %(message)s')
+    formatter = logging.Formatter("[%(asctime)s] %(levelname)s:%(name)s: %(message)s")
     sh = logging.StreamHandler()
     sh.setLevel(logging.INFO)
     sh.setFormatter(formatter)
@@ -45,7 +44,7 @@ def clean_text(text):
     output = []
     for char in text:
         cp = ord(char)
-        if cp == 0 or cp == 0xfffd or _is_control(char):
+        if cp == 0 or cp == 0xFFFD or _is_control(char):
             continue
         if _is_whitespace(char):
             output.append(" ")

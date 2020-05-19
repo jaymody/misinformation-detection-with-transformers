@@ -27,7 +27,7 @@ _logger = get_logger()
 
 
 @dataclass
-class DataArguments():
+class DataArguments:
     """Data arguments."""
 
     examples_file: str
@@ -55,19 +55,15 @@ def get_args_files(output_dir):
     return args_files
 
 
-def from_pretrained(pretrained_model_name_or_path, config_args={}, tokenizer_args={}, model_args={}):
-    config = AutoConfig.from_pretrained(
-        pretrained_model_name_or_path,
-        **config_args
-    )
+def from_pretrained(
+    pretrained_model_name_or_path, config_args={}, tokenizer_args={}, model_args={}
+):
+    config = AutoConfig.from_pretrained(pretrained_model_name_or_path, **config_args)
     tokenizer = AutoTokenizer.from_pretrained(
-        pretrained_model_name_or_path,
-        **tokenizer_args
+        pretrained_model_name_or_path, **tokenizer_args
     )
     model = AutoModelForSequenceClassification.from_pretrained(
-        pretrained_model_name_or_path,
-        config=config,
-        **model_args
+        pretrained_model_name_or_path, config=config, **model_args
     )
     return config, tokenizer, model
 
@@ -89,21 +85,23 @@ def train_test_split(examples, train_size=0.95, random_state=None):
     assert len(examples) == sum([len(example) for example in _examples])
 
     sss = StratifiedShuffleSplit(
-        n_splits=1,
-        train_size=train_size,
-        random_state=random_state
+        n_splits=1, train_size=train_size, random_state=random_state
     )
     labels = [example[0].label for example in _examples]
     train_index, test_index = list(sss.split(_examples, labels))[0]
 
     training_examples = [_examples[idx] for idx in train_index]
     num_training_claims = len(training_examples)
-    training_examples = [example for example_list in training_examples for example in example_list]
+    training_examples = [
+        example for example_list in training_examples for example in example_list
+    ]
     num_training_examples = len(training_examples)
 
     testing_examples = [_examples[idx] for idx in test_index]
     num_testing_claims = len(testing_examples)
-    testing_examples = [example for example_list in testing_examples for example in example_list]
+    testing_examples = [
+        example for example_list in testing_examples for example in example_list
+    ]
     num_testing_examples = len(testing_examples)
 
     _logger.info("Num Total Claims:\t\t%d", num_total_claims)
@@ -139,16 +137,18 @@ def compute_metrics(results):
     return metrics
 
 
-def train(output_dir,
-        pretrained_model_name_or_path,
-        data_args_file,
-        training_args_file,
-        config_args_file="",
-        tokenizer_args_file="",
-        model_args_file="",
-        label_list=[],
-        compute_metrics_fn=compute_metrics,
-        nproc=1):
+def train(
+    output_dir,
+    pretrained_model_name_or_path,
+    data_args_file,
+    training_args_file,
+    config_args_file="",
+    tokenizer_args_file="",
+    model_args_file="",
+    label_list=[],
+    compute_metrics_fn=compute_metrics,
+    nproc=1,
+):
     """Train sequence classifier."""
     config_args = {}
     tokenizer_args = {}
@@ -169,10 +169,7 @@ def train(output_dir,
         training_args = TrainingArguments(output_dir=output_dir, **json.load(fi))
 
     config, tokenizer, model = from_pretrained(
-        pretrained_model_name_or_path,
-        config_args,
-        tokenizer_args,
-        model_args
+        pretrained_model_name_or_path, config_args, tokenizer_args, model_args
     )
 
     label_list = label_list if label_list else list(config.label2id.values())
@@ -186,7 +183,7 @@ def train(output_dir,
             tokenizer=tokenizer,
             label_list=label_list,
             nproc=nproc,
-            cached_features_file=data_args.cached_train_features_file
+            cached_features_file=data_args.cached_train_features_file,
         )
         if data_args.cached_test_features_file:
             test_dataset = BasicDataset(
@@ -194,7 +191,7 @@ def train(output_dir,
                 tokenizer=tokenizer,
                 label_list=label_list,
                 nproc=nproc,
-                cached_features_file=data_args.cached_test_features_file
+                cached_features_file=data_args.cached_test_features_file,
             )
     else:
         training_examples = load_examples(data_args.examples_file)
@@ -203,7 +200,7 @@ def train(output_dir,
             training_examples, testing_examples = train_test_split(
                 training_examples,
                 train_size=data_args.train_size,
-                random_state=data_args.random_state
+                random_state=data_args.random_state,
             )
             test_dataset = BasicDataset(
                 testing_examples,
@@ -213,10 +210,7 @@ def train(output_dir,
             )
 
         train_dataset = BasicDataset(
-            training_examples,
-            tokenizer=tokenizer,
-            label_list=label_list,
-            nproc=nproc,
+            training_examples, tokenizer=tokenizer, label_list=label_list, nproc=nproc,
         )
 
     hparams_dict = {
@@ -240,8 +234,7 @@ def train(output_dir,
     tb_writer = SummaryWriter(log_dir=training_args.output_dir)
     tb_writer.add_hparams(hparams_dict, {})
     _example_input_to_model = torch.zeros(
-        [training_args.train_batch_size, tokenizer.max_len],
-        dtype=torch.long
+        [training_args.train_batch_size, tokenizer.max_len], dtype=torch.long
     )
     tb_writer.add_graph(model, _example_input_to_model)
 

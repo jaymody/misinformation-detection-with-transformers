@@ -26,16 +26,20 @@ def load_examples(examples_file):
 
 
 def generate_predictions(examples, pretrained_model_name_or_path, batch_size, nproc):
-    _logger.info("... loading config, tokenizer, and model from %s ...", pretrained_model_name_or_path)
+    _logger.info(
+        "... loading config, tokenizer, and model from %s ...",
+        pretrained_model_name_or_path,
+    )
     config = AutoConfig.from_pretrained(pretrained_model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
-    model = AutoModelForSequenceClassification.from_pretrained(pretrained_model_name_or_path, config=config)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        pretrained_model_name_or_path, config=config
+    )
 
     _logger.info("... loading dataset ...")
-    predict_dataset = BasicDataset(examples, tokenizer, [0,1,2], nproc=nproc)
+    predict_dataset = BasicDataset(examples, tokenizer, [0, 1, 2], nproc=nproc)
     predict_args = TrainingArguments(
-        output_dir="./",
-        per_gpu_eval_batch_size=batch_size,
+        output_dir="./", per_gpu_eval_batch_size=batch_size,
     )
 
     _logger.info("... loading trainer ...")
@@ -49,8 +53,8 @@ def generate_predictions(examples, pretrained_model_name_or_path, batch_size, np
     probs = collections.defaultdict(list)
     for example, prob in zip(examples, output.predictions):
         probs[example.guid].append(prob)
-    averaged_probs = {k: np.mean(v, axis=0) for k,v in probs.items()}
-    predictions = {k: np.argmax(v) for k,v in averaged_probs.items()}
+    averaged_probs = {k: np.mean(v, axis=0) for k, v in probs.items()}
+    predictions = {k: np.argmax(v) for k, v in averaged_probs.items()}
 
     return predictions
 
@@ -65,13 +69,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     examples = load_examples(args.examples_file)
     predictions = generate_predictions(
-        examples,
-        args.pretrained_model_name_or_path,
-        args.batch_size,
-        args.nproc
+        examples, args.pretrained_model_name_or_path, args.batch_size, args.nproc
     )
 
     _logger.info("... saving predictions to %s ...", args.predictions_file)
-    with open(args.predictions_file, 'w') as fo:
+    with open(args.predictions_file, "w") as fo:
         for claim_id, pred in predictions.items():
             fo.write("%d,%d\n" % (claim_id, pred))

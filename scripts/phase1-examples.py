@@ -15,7 +15,7 @@ _logger = get_logger()
 
 def load_claims(claims_file):
     _logger.info("... loading claims from %s ...", claims_file)
-    with open(claims_file, 'r') as fi:
+    with open(claims_file, "r") as fi:
         claims = [Claim.from_dict(d) for d in tqdm(json.load(fi))]
     return claims
 
@@ -27,8 +27,9 @@ def load_articles(articles_dir, nproc):
     with multiprocessing.Pool(nproc) as pool:
         articles = {
             article_id: article
-            for article_id, article in
-            tqdm(pool.imap_unordered(_load_article, filepaths), total=len(filepaths))
+            for article_id, article in tqdm(
+                pool.imap_unordered(_load_article, filepaths), total=len(filepaths)
+            )
         }
     return articles
 
@@ -40,7 +41,9 @@ def _load_article(filepath):
     return article_id, article
 
 
-def load_processor(articles, word2vec_file, min_examples, max_examples, min_threshold, nproc):
+def load_processor(
+    articles, word2vec_file, min_examples, max_examples, min_threshold, nproc
+):
     _logger.info("... loading processor ...")
     processor = MultiClaimSupportProcessor(
         articles=articles,
@@ -60,7 +63,9 @@ def generate_examples(claims, processor, nproc):
     all_examples = []
 
     with multiprocessing.Pool(nproc) as pool:
-        for examples in tqdm(pool.imap_unordered(_generate_examples, _inputs), total=len(_inputs)):
+        for examples in tqdm(
+            pool.imap_unordered(_generate_examples, _inputs), total=len(_inputs)
+        ):
             all_examples.extend(examples)
 
     globals()["_proc"] = None
@@ -68,7 +73,7 @@ def generate_examples(claims, processor, nproc):
 
 
 def _generate_examples(claims):
-    return _proc.generate_examples(claims) #pylint: disable=undefined-variable
+    return _proc.generate_examples(claims)  # pylint: disable=undefined-variable
 
 
 def generate_train_test_examples(claims, processor, train_test_split_ratio, nproc):
@@ -86,7 +91,7 @@ def generate_train_test_examples(claims, processor, train_test_split_ratio, npro
     _logger.info("... generating test examples ...")
     test_examples = generate_examples(test_claims, processor, nproc)
 
-    _logger.info("    num_total_examples = %d ...", len(train_examples+test_examples))
+    _logger.info("    num_total_examples = %d ...", len(train_examples + test_examples))
     _logger.info(" num_training_examples = %d ...", len(train_examples))
     _logger.info("  num_testing_examples = %d ...", len(test_examples))
 
@@ -114,26 +119,26 @@ if __name__ == "__main__":
         args.min_examples,
         args.max_examples,
         args.min_threshold,
-        args.nproc
+        args.nproc,
     )
 
     if args.train_test_split_ratio is None:
         examples = generate_examples(claims, processor, args.nproc)
         _logger.info("... saving examples to %s ...", args.examples_file)
-        with open(args.examples_file, 'w') as fo:
+        with open(args.examples_file, "w") as fo:
             json.dump([example.__dict__ for example in examples], fo)
     else:
         train_examples, test_examples = generate_train_test_examples(
-            claims,
-            processor,
-            args.train_test_split_ratio,
-            args.nproc
+            claims, processor, args.train_test_split_ratio, args.nproc
         )
         _logger.info("... saving examples to %s ...", args.examples_file)
-        with open(args.examples_file, 'w') as fo:
-            json.dump({
-                "training_examples": [example.__dict__ for example in train_examples],
-                "testing_examples": [example.__dict__ for example in test_examples],
-            }, fo)
-
-
+        with open(args.examples_file, "w") as fo:
+            json.dump(
+                {
+                    "training_examples": [
+                        example.__dict__ for example in train_examples
+                    ],
+                    "testing_examples": [example.__dict__ for example in test_examples],
+                },
+                fo,
+            )

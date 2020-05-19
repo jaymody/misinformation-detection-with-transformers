@@ -12,13 +12,23 @@ _logger = logging.getLogger(__name__)
 class BasicDataset(Dataset):
     """Basic Dataset."""
 
-    def __init__(self, examples, tokenizer, label_list=[], output_mode="classification", nproc=1, cached_features_file=None):
+    def __init__(
+        self,
+        examples,
+        tokenizer,
+        label_list=[],
+        output_mode="classification",
+        nproc=1,
+        cached_features_file=None,
+    ):
         self.tokenizer = tokenizer
         self.output_mode = output_mode
         self.max_length = tokenizer.max_len
         self.label_map = {label: i for i, label in enumerate(label_list)}
         if cached_features_file:
-            _logger.info(f"... loading features from cached file %s ...", cached_features_file)
+            _logger.info(
+                f"... loading features from cached file %s ...", cached_features_file
+            )
             self.features = torch.load(cached_features_file)
         else:
             _logger.info("... converting examples to features ...")
@@ -40,7 +50,7 @@ class BasicDataset(Dataset):
             example.text_a,
             example.text_b,
             max_length=self.max_length,
-            pad_to_max_length=True
+            pad_to_max_length=True,
         )
         label = self.label_from_example(example)
         return InputFeatures(**inputs, label=label)
@@ -49,7 +59,10 @@ class BasicDataset(Dataset):
         all_features = []
         all_inputs = [(self, example) for example in examples]
         with multiprocessing.Pool(nproc) as pool:
-            for features in tqdm(pool.imap(self.convert_example_to_features, all_inputs, chunksize=512), total=len(all_inputs)):
+            for features in tqdm(
+                pool.imap(self.convert_example_to_features, all_inputs, chunksize=512),
+                total=len(all_inputs),
+            ):
                 all_features.append(features)
         return all_features
 
@@ -57,7 +70,7 @@ class BasicDataset(Dataset):
         _logger.info(f".. saving features to cached file %s ...", cached_features_file)
         torch.save(self.features, cached_features_file)
 
-    def  __len__(self):
+    def __len__(self):
         return len(self.features)
 
     def __getitem__(self, i):
