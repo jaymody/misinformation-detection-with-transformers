@@ -39,18 +39,35 @@ def split_sentences(text):
     return [sentence.strip() for sentence in nltk.tokenize.sent_tokenize(text)]
 
 
-def clean_text(text):
+def clean_text(text, remove_punctuation=False):
     """Cleans the text of whitespace and control chars."""
     output = []
     for char in text:
         cp = ord(char)
         if cp == 0 or cp == 0xFFFD or _is_control(char):
             continue
+        if remove_punctuation and _is_punctuation(char):
+            continue
         if _is_whitespace(char):
             output.append(" ")
         else:
             output.append(char)
     return "".join(output).strip()
+
+
+def _is_punctuation(char):
+    cp = ord(char)
+    if (
+        (cp >= 33 and cp <= 47)
+        or (cp >= 58 and cp <= 64)
+        or (cp >= 91 and cp <= 96)
+        or (cp >= 123 and cp <= 126)
+    ):
+        return True
+    cat = unicodedata.category(char)
+    if cat.startswith("P"):
+        return True
+    return False
 
 
 def _is_whitespace(char):
