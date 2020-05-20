@@ -33,6 +33,9 @@ class Claim:
         self.explanation = explanation
         self.support = support
 
+    def to_dict(self):
+        return self.__dict__
+
     @classmethod
     def from_dict(cls, d):
         if "id" in d:
@@ -62,6 +65,16 @@ class Article:
         self.author = author
         self.url = url
         self.date = date
+
+    def to_dict(self):
+        return self.__dict__
+
+    @classmethod
+    def from_dict(cls, d):
+        if "id" in d:
+            _id = d.pop("id")
+            return cls(_id, **d)
+        return cls(**d)
 
     @classmethod
     def from_txt(cls, id, text, **kwargs):
