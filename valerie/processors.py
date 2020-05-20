@@ -12,6 +12,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from . import utils
+from .preprocessing import split_sentences
 
 _logger = logging.getLogger(__name__)
 
@@ -101,7 +102,7 @@ class MultiClaimSupportProcessor:
         document = [
             (ref, sentence)
             for ref in claim.related_articles
-            for sentence in utils.split_sentences(self.articles[ref].content)
+            for sentence in split_sentences(self.articles[ref].content)
         ]
         references, sentences = map(list, zip(*document))
 
@@ -209,6 +210,33 @@ class SingleClaimSupportProcessor(MultiClaimSupportProcessor):
         return examples
 
 
+def tfidf_cosine_similarity(v1, v2):
+    # tf_idf vectors are sparse (so scipy.distance won't work on them, we are
+    # forced to use sklearn)
+    return float(cosine_similarity(v1, v2))
+
+
+def word2vec_embed_sentence(tokens, word2vec_model):
+    vectors = []
+    for token in tokens:
+        try:
+            vectors.append(word2vec_model[token])
+        except:
+            continue
+    return np.nan if not vectors else np.mean(vectors, axis=0)
+
+
+def word2vec_cosine_similarity(v1, v2):
+    # word2vec vectors are of shape (embedding_size) so we can use scipy
+    # without having to reshape the vectors vs using sklearn (plus scipy
+    # is faster at computing the similarity score)
+    return (
+        0.0
+        if np.isnan(np.min(v1)) or np.isnan(np.min(v2))
+        else float(1 - spatial.distance.cosine(v1, v2))
+    )
+
+
 def generate_sentence_similarity_scores(subject, sentences, word2vec_model, avg=True):
     """Generates similarity scores for the subject sentence against other sentences.
 
@@ -227,37 +255,22 @@ def generate_sentence_similarity_scores(subject, sentences, word2vec_model, avg=
     assert len(sentences) == len(tfidf_vectors)
 
     # word2vec sentence vectors
-    def word2vec_sentence(sentence):
-        words = nltk.tokenize.word_tokenize(sentence)
-        vectors = []
-        for word in words:
-            try:
-                vectors.append(word2vec_model[word])
-            except:
-                continue
-        return np.nan if not vectors else np.mean(vectors, axis=0)
-
-    word2vec_vectors = [word2vec_sentence(sentence) for sentence in sentences]
+    word2vec_vectors = [
+        word2vec_embed_sentence(sentence, word2vec_model) for sentence in sentences
+    ]
     assert len(sentences) == len(word2vec_vectors)
 
     # calculate and sort cosine similarity scores for each vector
     scores = []
     for tfidf_vector, word2vec_vector in zip(tfidf_vectors, word2vec_vectors):
-        # we use two different cosine functions since the tf_idf vectors are
-        # sparse (so scipy.distance won't work on them, we are forced to use
-        # sklearn), and the word2vec vectors are of shape (embedding_size)
-        # so we can use scipy without having to reshape the vectors (and scipy
-        # is faster at computing the similarity score)
-        tfidf_score = float(cosine_similarity(tfidf_vectors[-1], tfidf_vector))
-        word2vec_score = (
-            0.0
-            if np.isnan(np.min(word2vec_vector))
-            else float(
-                1 - spatial.distance.cosine(word2vec_vectors[-1], word2vec_vector)
-            )
+        scores.append(
+            {
+                "tfidf": tfidf_cosine_similarity(tfidf_vectors[-1], tfidf_vector),
+                "word2vec": word2vec_cosine_similarity(
+                    word2vec_vectors[-1], word2vec_vector
+                ),
+            }
         )
-
-        scores.append({"tfidf": tfidf_score, "word2vec": word2vec_score})
     scores.pop()  # remove the subject sentence itself from the scores
 
     if avg:

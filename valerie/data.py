@@ -4,7 +4,7 @@ import logging
 
 import bs4
 
-from . import utils
+from .preprocessing import clean_text
 
 _logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class Claim:
     ):
         """Constructor for Claim."""
         self.id = id
-        self.claim = utils.clean_text(claim)
+        self.claim = clean_text(claim)
         self.claimant = claimant
         self.label = label
         self.date = date
@@ -79,7 +79,7 @@ class Article:
     @classmethod
     def from_txt(cls, id, text, **kwargs):
         """Construct an Article given text."""
-        text = utils.clean_text(text)
+        text = clean_text(text)
         return cls(id, content=text, **kwargs)
 
     @classmethod
@@ -100,11 +100,11 @@ class Article:
 
         text = ""
         for t in texts:
-            t = utils.clean_text(t)
+            t = clean_text(t)
             if t and len(t) > 32:  # dissallow empty/short text sequences
                 text += t + " "
 
         if "title" not in kwargs:
             title = soup.title if soup.title and soup.title.string else None
-            title = utils.clean_text(title.string) if title else None
+            title = clean_text(title.string) if title else None
         return cls(id, content=text, title=title, **kwargs)
