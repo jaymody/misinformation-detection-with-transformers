@@ -23,7 +23,8 @@ def query(query_string, from_idx=0):
     if resp.status_code == requests.codes.ok:  # pylint: disable=no-member
         return resp.json()
     else:
-        _logger.warning("query failed, response status is not ok")
+        _logger.warning("query failed, response status was not OK")
+        return None
 
 
 def enhanced_query(query_string, stopwords, from_idx=0):

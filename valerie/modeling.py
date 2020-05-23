@@ -212,6 +212,12 @@ class ClaimantModel:
         except KeyError:
             return None
 
+    def num_examples(self, claim):
+        try:
+            return self.model[claim.claimant]["total"]
+        except KeyError:
+            return None
+
     def score(self, claim):
         try:
             return self.model[claim.claimant]["score"]
