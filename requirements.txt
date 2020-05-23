@@ -22,6 +22,7 @@ python-dateutil==2.8.1
 pytz==2020.1
 regex==2020.4.4
 requests==2.23.0
+requests-file==1.5.1
 s3transfer==0.3.3
 sacremoses==0.0.41
 scikit-learn==0.22.2.post1
@@ -30,6 +31,7 @@ sentencepiece==0.1.86
 six==1.14.0
 smart-open==2.0.0
 soupsieve==2.0
+tldextract==2.2.2
 tokenizers==0.7.0
 torch==1.5.0
 tqdm==4.45.0
