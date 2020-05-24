@@ -1,6 +1,9 @@
 """Utility functions."""
 import os
+import json
 import logging
+
+from tqdm import tqdm
 
 _logger = logging.getLogger(__name__)
 
@@ -41,3 +44,41 @@ def load_word2vec(word2vec_path):
 
     _logger.info("... loading word2vec model ...")
     return KeyedVectors.load_word2vec_format(word2vec_path, binary=True)
+
+
+def load_claims(filepath, as_list=False, verbose=True):
+    from valerie.data import Claim
+
+    with open(filepath) as fi:
+        claims = {
+            k: Claim.from_dict(v)
+            for k, v in tqdm(json.load(fi).items(), disable=not verbose)
+        }
+
+    if as_list:
+        return sorted(list(claims.values()), key=lambda x: x.id)
+    return claims
+
+
+def save_claims(filepath, claims, **kwargs):
+    with open(filepath, "w") as fo:
+        json.dump({k: v.to_dict() for k, v in claims.items()}, fo, **kwargs)
+
+
+def load_articles(filepath, as_list=False, verbose=True):
+    from valerie.data import Article
+
+    with open(filepath) as fi:
+        articles = {
+            k: Article.from_dict(v)
+            for k, v in tqdm(json.load(fi).items(), disable=not verbose)
+        }
+
+    if as_list:
+        return sorted(list(articles.values()), key=lambda x: x.id)
+    return articles
+
+
+def save_articles(filepath, articles, **kwargs):
+    with open(filepath, "w") as fo:
+        json.dump({k: v.to_dict() for k, v in articles.items()}, fo, **kwargs)
