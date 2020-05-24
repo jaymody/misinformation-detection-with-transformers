@@ -85,6 +85,7 @@ class SequenceClassificationDataset(Dataset):
             for features in tqdm(
                 pool.imap(self.convert_example_to_features, all_inputs, chunksize=512),
                 total=len(all_inputs),
+                desc="converting examples to features",
             ):
                 all_features.append(features)
         return all_features
