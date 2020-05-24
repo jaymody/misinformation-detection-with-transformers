@@ -1,5 +1,6 @@
 """Data classes."""
 import os
+import json
 import logging
 
 import bs4
@@ -43,6 +44,12 @@ class Claim:
             _id = d.pop("id")
             return cls(_id, **d)
         return cls(**d)
+
+    def __repr__(self):
+        return json.dumps(self.__dict__, indent=2)
+
+    def __eq__(self, other):
+        return self.id == other.id
 
 
 class Article:
@@ -109,3 +116,9 @@ class Article:
             title = soup.title if soup.title and soup.title.string else None
             title = clean_text(title.string) if title else None
         return cls(id, content=text, title=title, **kwargs)
+
+    def __repr__(self):
+        return json.dumps(self.__dict__, indent=2)
+
+    def __eq__(self, other):
+        return self.id == other.id
