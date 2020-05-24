@@ -7,7 +7,6 @@ import numpy as np
 import pandas as pd
 
 import torch
-import tldextract
 import numpy as np
 from tqdm import tqdm
 from transformers import (
@@ -254,9 +253,10 @@ class ClaimantModel:
 class SourceModel:
     """Source modeling based on article sources."""
 
-    def __init__(self, model={}, max_examples=0):
+    def __init__(self, model={}, max_threshold=100, min_threshold=3):
         self.model = model
-        self.max_examples = max_examples
+        self.max_threshold = max_threshold
+        self.min_threshold = min_threshold
 
     @classmethod
     def from_pretrained(cls, model_file):
@@ -267,13 +267,18 @@ class SourceModel:
         with open(model_file, "w") as fo:
             json.dump(self.__dict__, fo)
 
-    def train(self, articles, min_threshold=10):
+    def train(self, articles, min_threshold=0):
         self.model = self.analyze(articles, min_threshold=min_threshold)
-        self.max_examples = max(self.model.values())
 
     def predict(self, article):
         try:
-            return self.model[article.source] / self.max_examples
+            value = self.model[article.source]
+            if value > self.max_threshold:
+                return 1.0
+            elif value < self.min_threshold:
+                return 0.0
+            else:
+                return value / self.max_threshold
         except KeyError:
             return None
 

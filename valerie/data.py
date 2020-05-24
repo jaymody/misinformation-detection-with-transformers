@@ -3,6 +3,7 @@ import os
 import logging
 
 import bs4
+import tldextract
 
 from .preprocessing import clean_text
 
@@ -61,7 +62,7 @@ class Article:
         self.id = id
         self.title = title
         self.content = content
-        self.source = source
+        self.source = tldextract.extract(url).domain if url else None
         self.author = author
         self.url = url
         self.date = date
