@@ -18,6 +18,9 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
         torch \
         scikit-learn \
         scipy \
+        spacy \
+        wordninja \
+        tldextract \
         tqdm \
         pandas \
         nltk \
@@ -26,7 +29,8 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
         gensim && \
     python3 -m pip install --no-cache-dir git+https://github.com/huggingface/transformers && \
     python3 -m pip install --no-cache-dir . && \
-    python3 -m nltk.downloader punkt
+    python3 -m nltk.downloader punkt && \
+    python -m spacy download en_core_web_lg
 
 WORKDIR /usr/src/
 COPY . /usr/src/
