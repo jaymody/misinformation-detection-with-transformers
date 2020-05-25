@@ -68,7 +68,7 @@ def save_responses(responses, filepath):
 
 def all_query(claim, do_ner=True, do_claimant=True, do_stopword=True, from_idx=0):
     dis = ["textcat", "tagger", "parser"]
-    if do_ner:
+    if not do_ner:
         dis += ["ner"]
     claim_doc = nlp(claim.claim, disable=dis)
 
@@ -94,8 +94,8 @@ if __name__ == "__main__":
     ##### Run All Perumatationns of Params #####
     params = {
         "do_ner": [False, True],
-        "do_claimant": [False, True],
-        "do_stopword": [False, True],
+        "do_claimant": [True],
+        "do_stopword": [True],
         "from_idx": [0],
     }
     run_configs = []
