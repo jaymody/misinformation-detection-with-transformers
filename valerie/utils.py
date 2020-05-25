@@ -51,7 +51,7 @@ def load_claims(filepath, as_list=False, verbose=True):
 
     with open(filepath) as fi:
         claims = {
-            k: Claim.from_dict(v)
+            int(k): Claim.from_dict(v)
             for k, v in tqdm(
                 json.load(fi).items(), desc="loading claims", disable=not verbose
             )
