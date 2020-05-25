@@ -9,7 +9,7 @@ import wordninja
 _logger = logging.getLogger(__name__)
 
 
-def extract_words_from_url(url, stopwords):
+def extract_words_from_url(url):
     """Extracts words from a url.
 
     Example
@@ -41,11 +41,7 @@ def extract_words_from_url(url, stopwords):
     words = [
         word
         for word in words
-        if word
-        and word not in stopwords
-        and word not in remove
-        and not word.isnumeric()
-        and len(word) > 2
+        if word and word not in remove and not word.isnumeric() and len(word) > 2
     ]
     return words
 
