@@ -85,6 +85,10 @@ def convert_html_hits_to_article(res):
 
         article = Article.from_html(hit["url"], hit["content"], url=hit["url"])
         output.append({"score": hit["score"], "article": article.to_dict()})
+
+        # not sure why id is not always being copied to dict, so here's a fix
+        output[-1]["article"]["id"] = hit["url"]
+
         visited.add(hit["url"])
 
     return output
