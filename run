@@ -1,25 +1,16 @@
 #!/bin/bash
 
-SRC_DIR="/usr/src"
-CLAIMS_FILE="/usr/local/dataset/metadata.json"
-ARTICLES_DIR="/usr/local/dataset/articles"
-EXAMPLES_FILE="${SRC_DIR}/examples.json"
-PREDICTIONS_FILE="/usr/local/predictions.txt"
-WORD2VEC_FILE="${SRC_DIR}/models/GoogleNews-vectors-negative300.bin"
-PRETRAINED_MODEL_NAME_OR_PATH="${SRC_DIR}/models/transformer/"
+SRC_DIR="/usr/src/"
+ENVRC_FILE="${SRC_DIR}/.envrc"
+METADATA_FILE="/usr/local/dataset/metadata.json"
+PREDICTIONS_FILE="/usr/local/predictions.json"
+CLAIMANT_MODEL_FILE="${SRC_DIR}/models/claimant_model.json"
 
-python3 ${SRC_DIR}/phase1-examples.py \
-    --claims_file ${DATA_PATH} \
-    --articles_dir ${ARTICLES_DIR} \
-    --examples_file ${EXAMPLES_FILE} \
-    --word2vec_file ${WORD2VEC_FILE} \
-    --keep_n 5 \
-    --min_threshold 0.40 \
-    --min_exmaples 4 \
-    --nproc 4
+source ${ENVRC_FILE}
+cd ${SRC_DIR}
 
-python3 ${SRC_DIR}/phase1-predict.py \
-    --examples_file ${EXAMPLES_FILE} \
+python3 ${SRC_DIR}/pipeline.py \
+    --metadata_file ${METADATA_FILE} \
+    --claimant_model_file ${CLAIMANT_MODEL_FILE} \
     --predictions_file ${PREDICTIONS_FILE} \
-    --pretrained_model_name_or_path ${PRETRAINED_MODEL_NAME_OR_PATH} \
-    --batch_size 4 \
+    --nproc 4
