@@ -6,8 +6,8 @@ import spacy
 from tqdm import tqdm
 
 from valerie import search
-from valerie.data import Article
-from valerie.utils import load_claims, get_logger
+from valerie.data import Article, load_claims
+from valerie.utils import get_logger
 from valerie.scoring import validate_predictions_phase2, compute_score_phase2
 from valerie.preprocessing import clean_text
 

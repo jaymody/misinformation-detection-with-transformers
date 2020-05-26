@@ -1,10 +1,13 @@
 """Data classes."""
 import os
+import glob
 import json
 import logging
+import multiprocessing
 
 import bs4
 import tldextract
+from tqdm import tqdm
 
 from .preprocessing import clean_text
 
@@ -122,3 +125,95 @@ class Article:
 
     def __eq__(self, other):
         return self.id == other.id
+
+
+def load_claims(filepath, as_list=False, verbose=True):
+    with open(filepath) as fi:
+        claims = {
+            int(k): Claim.from_dict(v)
+            for k, v in tqdm(
+                json.load(fi).items(), desc="loading claims", disable=not verbose
+            )
+        }
+
+    if as_list:
+        return sorted(list(claims.values()), key=lambda x: x.id)
+    return claims
+
+
+def save_claims(filepath, claims, **kwargs):
+    with open(filepath, "w") as fo:
+        json.dump({k: v.to_dict() for k, v in claims.items()}, fo, **kwargs)
+
+
+def load_articles(filepath, as_list=False, verbose=True):
+    with open(filepath) as fi:
+        articles = {
+            k: Article.from_dict(v)
+            for k, v in tqdm(
+                json.load(fi).items(), desc="loading articles", disable=not verbose,
+            )
+        }
+
+    if as_list:
+        return sorted(list(articles.values()), key=lambda x: x.id)
+    return articles
+
+
+def save_articles(filepath, articles, **kwargs):
+    with open(filepath, "w") as fo:
+        json.dump({k: v.to_dict() for k, v in articles.items()}, fo, **kwargs)
+
+
+def claims_from_phase2(claims_file):
+    with open(claims_file) as fi:
+        claims = {d["id"]: Claim(**d) for d in tqdm(json.load(fi))}
+
+    # remove "train_articles" string from related_articles keys
+    for claim in claims.values():
+        keys = list(claim.related_articles.keys())
+        for old_name in keys:
+            new_name = os.path.basename(old_name)
+            claim.related_articles[new_name] = claim.related_articles.pop(old_name)
+
+    for claim in claims.values():
+        for key in claim.related_articles:
+            assert "train" not in key
+
+    return claims
+
+
+def articles_from_phase2(articles_dir, claims, nproc=1):
+    art_id_to_url = {
+        k: v for claim in claims.values() for k, v in claim.related_articles.items()
+    }
+
+    def visit(fpath):
+        art_id = os.path.basename(fpath)
+
+        # certain articles are not part of any of the related articles from the claims:
+        # articles = load all articles from articles dir
+        # claims_articles_set = set([art for claim in claims for art in list(claim.related_articles.keys())])#
+        # articles_set = set(articles.keys())
+        # articles_set - claims_articles_set
+        # the above produces 38 entries
+        #
+        # if the article is not found in art_id_to_url, this means none of the claims
+        # ever refer it, so we ignore it
+        try:
+            url = art_id_to_url[art_id]
+        except KeyError:
+            return None, None
+
+        with open(fpath) as fi:
+            article = Article.from_html(art_id, fi.read(), url=url)
+        return art_id, article
+
+    pool = multiprocessing.Pool(nproc)
+    fpaths = glob.glob(os.path.join(articles_dir, "*.html"))
+    articles = {}
+    for art_id, article in tqdm(pool.imap_unordered(visit, fpaths), total=len(fpaths)):
+        if art_id is not None:
+            articles[art_id] = article
+
+    return articles
