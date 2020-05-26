@@ -12,27 +12,13 @@ RUN apt update && \
         python3-pip && \
     rm -rf /var/lib/apt/lists
 
-RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir \
-        mkl \
-        torch \
-        scikit-learn \
-        scipy \
-        spacy \
-        wordninja \
-        tldextract \
-        tqdm \
-        pandas \
-        nltk \
-        bs4 \
-        requests \
-        gensim && \
-    python3 -m pip install --no-cache-dir git+https://github.com/huggingface/transformers && \
-    python3 -m pip install --no-cache-dir . && \
-    python3 -m nltk.downloader punkt && \
-    python -m spacy download en_core_web_lg
-
 WORKDIR /usr/src/
 COPY . /usr/src/
 
-CMD ["/bin/bash/run"]
+RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -m pip install --no-cache-dir -r requirements.txt && \
+    python3 -m pip install --no-cache-dir . && \
+    python3 -m nltk.downloader punkt && \
+    python3 -m spacy download en_core_web_lg
+
+CMD [ "bash", "/usr/src/run" ]
