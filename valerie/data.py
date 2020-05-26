@@ -30,7 +30,7 @@ class Claim:
     ):
         """Constructor for Claim."""
         self.id = id
-        self.claim = clean_text(claim)[:4000]  # restrict num chars
+        self.claim = clean_text(claim)[:4000] if claim else None  # restrict num chars
         self.claimant = claimant
         self.label = label
         self.date = date
@@ -70,8 +70,10 @@ class Article:
     ):
         """Constructor for Article."""
         self.id = id
-        self.title = title[:4000]  # restrict num chars
-        self.content = content[:16000]  # restrict num chars in claim
+        self.title = title[:4000] if title else None  # restrict num chars
+        self.content = (
+            content[:16000] if content else None
+        )  # restrict num chars in claim
         self.source = tldextract.extract(url).domain if url else None
         self.author = author
         self.url = url
@@ -183,14 +185,21 @@ def claims_from_phase2(claims_file):
     return claims
 
 
+def _articles_from_phase2_visit(_input):
+    art_id, fpath, url = _input
+    with open(fpath) as fi:
+        article = Article.from_html(art_id, fi.read(), url=url)
+    return art_id, article
+
+
 def articles_from_phase2(articles_dir, claims, nproc=1):
     art_id_to_url = {
         k: v for claim in claims.values() for k, v in claim.related_articles.items()
     }
 
-    def visit(fpath):
-        art_id = os.path.basename(fpath)
-
+    _inputs = []
+    fpaths = glob.glob(os.path.join(articles_dir, "*.html"))
+    for fpath in fpaths:
         # certain articles are not part of any of the related articles from the claims:
         # articles = load all articles from articles dir
         # claims_articles_set = set([art for claim in claims for art in list(claim.related_articles.keys())])#
@@ -201,18 +210,17 @@ def articles_from_phase2(articles_dir, claims, nproc=1):
         # if the article is not found in art_id_to_url, this means none of the claims
         # ever refer it, so we ignore it
         try:
+            art_id = os.path.basename(fpath)
             url = art_id_to_url[art_id]
+            _inputs.append((art_id, fpath, url))
         except KeyError:
-            return None, None
-
-        with open(fpath) as fi:
-            article = Article.from_html(art_id, fi.read(), url=url)
-        return art_id, article
+            continue
 
     pool = multiprocessing.Pool(nproc)
-    fpaths = glob.glob(os.path.join(articles_dir, "*.html"))
     articles = {}
-    for art_id, article in tqdm(pool.imap_unordered(visit, fpaths), total=len(fpaths)):
+    for art_id, article in tqdm(
+        pool.imap_unordered(_articles_from_phase2_visit, _inputs), total=len(fpaths)
+    ):
         if art_id is not None:
             articles[art_id] = article
 
