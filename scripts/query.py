@@ -2,7 +2,6 @@ import os
 import json
 import multiprocessing
 
-import nltk
 import spacy
 from tqdm import tqdm
 
@@ -10,8 +9,7 @@ from valerie import search
 from valerie.data import Article
 from valerie.utils import load_claims, get_logger
 from valerie.scoring import validate_predictions_phase2, compute_score_phase2
-from valerie.modeling import SourceModel
-from valerie.preprocessing import extract_words_from_url, clean_text
+from valerie.preprocessing import clean_text
 
 _logger = get_logger()
 
@@ -28,7 +26,9 @@ def compute_query_score(responses, claims):
         labels[claim.id] = claim.to_dict()
         predictions[claim.id] = {
             "label": claim.label,
-            "related_articles": [hit["url"] for hit in v["res"]["hits"]["hits"][:2]]
+            "related_articles": [
+                hit["article"]["url"] for hit in v["res"]["hits"]["hits"][:2]
+            ]
             if v["res"]
             else [],
             "explanation": "",
@@ -36,9 +36,9 @@ def compute_query_score(responses, claims):
         perfect_predictions[claim.id] = {
             "label": claim.label,
             "related_articles": [
-                hit["url"]
+                hit["article"]["url"]
                 for hit in v["res"]["hits"]["hits"]
-                if hit["url"] in claim.related_articles.values()
+                if hit["article"]["url"] in claim.related_articles.values()
             ][:2]
             if v["res"]
             else [],
@@ -75,26 +75,30 @@ def generate_query(claim):
     return query
 
 
-def convert_html_to_text_content(res):
+def convert_html_hits_to_article(res):
     visited = set()
-    for i, hit in enumerate(res["hits"]["hits"]):
+    output = []
+
+    for hit in res["hits"]["hits"]:
         if hit["url"] in visited:
             continue
 
         article = Article.from_html(hit["url"], hit["content"], url=hit["url"])
-        res["hits"]["hits"][i]["content"] = article.content
+        output.append({"score": hit["score"], "article": article.to_dict()})
         visited.add(hit["url"])
+
+    return output
 
 
 def pipeline(claim):
     query = generate_query(claim)
     res = search.query(query)
-    convert_html_to_text_content(res)
+    res["hits"]["hits"] = convert_html_hits_to_article(res)
     return claim, query, res
 
 
 if __name__ == "__main__":
-    claims = load_claims("data/phase2/all_data/claims.json", as_list=True)[:None]
+    claims = load_claims("data/phase2/all_data/claims.json", as_list=True)
 
     pool = multiprocessing.Pool(4)
     responses = {}
