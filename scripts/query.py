@@ -98,12 +98,13 @@ def pipeline(claim):
 
 
 if __name__ == "__main__":
-    claims = load_claims("data/phase2/all_data/claims.json", as_list=True)
+    claims = load_claims("data/phase2/all_data/claims.json")
+    run_claims = list(claims.values())
 
     pool = multiprocessing.Pool(4)
     responses = {}
     for claim, query, res in tqdm(
-        pool.imap_unordered(pipeline, claims), total=len(claims)
+        pool.imap_unordered(pipeline, run_claims), total=len(run_claims)
     ):
         responses[claim.id] = {"id": claim.id, "res": res, "query": query}
 
