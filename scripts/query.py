@@ -84,6 +84,9 @@ def convert_html_hits_to_article(res):
             continue
 
         article = Article.from_html(hit["url"], hit["content"], url=hit["url"])
+        if not article.content or len(article.content) < 32:
+            continue
+
         output.append({"score": hit["score"], "article": article.to_dict()})
 
         # not sure why id is not always being copied to dict, so here's a fix
