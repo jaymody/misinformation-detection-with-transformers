@@ -27,7 +27,7 @@ class Claim:
     ):
         """Constructor for Claim."""
         self.id = id
-        self.claim = clean_text(claim)
+        self.claim = clean_text(claim)[:4000]  # restrict num chars
         self.claimant = claimant
         self.label = label
         self.date = date
@@ -67,8 +67,8 @@ class Article:
     ):
         """Constructor for Article."""
         self.id = id
-        self.title = title
-        self.content = content
+        self.title = title[:4000]  # restrict num chars
+        self.content = content[:16000]  # restrict num chars in claim
         self.source = tldextract.extract(url).domain if url else None
         self.author = author
         self.url = url
