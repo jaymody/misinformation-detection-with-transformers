@@ -118,11 +118,25 @@ def claimant_classification(claims, claimant_model_file):
 #     # returns a dict of claim ids with their associated classification output probs/features
 
 
-########## Create Examples ##########
+########## Generate Examples ##########
 
 
-# def create_examples(claims, articles):
-#     pass
+# def _generate_examples(claim):
+#     claim_doc = nlp(claim.claim, disable=["textcat", "tagger", "parser", "ner"])
+
+#     for k, article in related_articles.items():
+#         article_doc = nlp(
+#             article.title + article.content,
+#             disable=["textcat", "tagger", "parser", "ner"],
+#         )
+#         # continue from here
+
+
+# def generate_examples(claims, nproc):
+#     pool = multiprocessing.Pool(nproc)
+
+#     for claim in claims:
+#         pass
 
 
 ########## Related Articles ##########
@@ -139,6 +153,8 @@ def select_related_articles(claims, responses, article_limit=2):
     for k, res in tqdm(responses.items(), desc="selecting articles"):
         claim = claims[k]
         claim.related_articles = {}
+        if res["res"] is None:
+            continue
 
         cur_art = 0
         for hit in res["res"]["hits"]["hits"]:
@@ -203,7 +219,8 @@ def convert_html_hits_to_article(res):
 def search_pipeline(claim):
     query = query_expansion(claim)
     res = search.query(query)
-    res["hits"]["hits"] = convert_html_hits_to_article(res)
+    if res is not None:
+        res["hits"]["hits"] = convert_html_hits_to_article(res)
     return claim, query, res
 
 
@@ -271,8 +288,8 @@ if __name__ == "__main__":
         related_articles = related_articles[:2]
         assert isinstance(related_articles, list)
         assert len(related_articles) >= 0 and len(related_articles) <= 2
-        assert isinstance(related_articles[0], str)
-        assert isinstance(related_articles[1], str)
+        for rel_art in related_articles:
+            assert isinstance(rel_art, str)
 
         output[k] = {
             "label": predictions[k],
