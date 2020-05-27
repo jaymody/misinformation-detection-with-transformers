@@ -1,12 +1,9 @@
 import os
 import json
-import random
 import argparse
 import collections
 from dataclasses import dataclass
 
-import torch
-import numpy as np
 from tqdm import tqdm
 from sklearn.model_selection import StratifiedShuffleSplit
 
@@ -14,7 +11,6 @@ from valerie.utils import get_logger
 from valerie.modeling import (
     SequenceClassificationInputExample,
     SequenceClassificationTrainingArgs,
-    SequenceClassificationDataset,
     SequenceClassificationModel,
 )
 

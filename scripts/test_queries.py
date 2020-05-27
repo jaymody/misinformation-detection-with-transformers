@@ -3,7 +3,6 @@ import time
 import json
 import itertools
 
-import nltk
 import spacy
 from tqdm import tqdm
 
@@ -11,7 +10,7 @@ from valerie import search
 from valerie.data import load_claims
 from valerie.utils import get_logger
 from valerie.scoring import validate_predictions_phase2, compute_score_phase2
-from valerie.preprocessing import extract_words_from_url, clean_text
+from valerie.preprocessing import clean_text
 
 _logger = get_logger()
 

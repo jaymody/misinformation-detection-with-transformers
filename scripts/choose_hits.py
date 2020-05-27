@@ -1,22 +1,14 @@
-import os
 import json
-import multiprocessing
 
-import nltk
 import spacy
-import torch
 import numpy as np
-import torch.nn as nn
-import torch.nn.functional as F
 from tqdm import tqdm
-from sklearn.model_selection import train_test_split
 
-from valerie import search
-from valerie.data import Article, load_claims
+from valerie.data import Article
 from valerie.utils import get_logger
 from valerie.scoring import validate_predictions_phase2, compute_score_phase2
 from valerie.modeling import SourceModel
-from valerie.preprocessing import extract_words_from_url, clean_text
+from valerie.preprocessing import extract_words_from_url
 
 _logger = get_logger()
 
