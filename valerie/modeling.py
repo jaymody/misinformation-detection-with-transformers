@@ -2,7 +2,10 @@
 import json
 import logging
 import collections
+import dataclasses
 import multiprocessing
+from dataclasses import dataclass
+from typing import List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -16,7 +19,6 @@ from transformers import (
     AutoModelForSequenceClassification,
     Trainer,
     TrainingArguments,
-    InputExample,
     InputFeatures,
 )
 from torch.utils.data.dataset import Dataset
@@ -25,8 +27,37 @@ from sklearn.metrics import classification_report
 _logger = logging.getLogger(__name__)
 
 
-class SequenceClassificationInputExample(InputExample):
-    pass
+@dataclass
+class SequenceClassificationExample:
+    """
+    A single input example for simple sequence classification.
+
+    Parameters
+    ----------
+    guid
+        The claim id for the example.
+    text_a
+        string. The untokenized text of the first sequence. For single sequence
+        tasks, only this sequence must be specified.
+    text_b
+        The untokenized text of the second sequence. Only must be specified for
+        sequence pair tasks.
+    label
+        The label of the example. This should be specified for train and dev
+        examples, but not for test examples.
+    art_id
+        The article id for the text_b string (if it exists).
+    """
+
+    guid: str
+    text_a: str
+    text_b: Optional[str] = None
+    label: Optional[str] = None
+    art_id: Optional[str] = None
+
+    def to_json_string(self):
+        """Serializes this instance to a JSON string."""
+        return json.dumps(dataclasses.asdict(self), indent=2) + "\n"
 
 
 class SequenceClassificationTrainingArgs(TrainingArguments):

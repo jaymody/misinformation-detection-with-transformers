@@ -9,7 +9,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 
 from valerie.utils import get_logger
 from valerie.modeling import (
-    SequenceClassificationInputExample,
+    SequenceClassificationExample,
     SequenceClassificationTrainingArgs,
     SequenceClassificationModel,
 )
@@ -49,7 +49,7 @@ def get_args_files(output_dir):
 def load_examples(examples_file):
     with open(examples_file) as fi:
         examples = [
-            SequenceClassificationInputExample(**example) for example in json.load(fi)
+            SequenceClassificationExample(**example) for example in json.load(fi)
         ]
     return examples
 
