@@ -12,8 +12,8 @@ RUN apt update && \
         python3-pip && \
     rm -rf /var/lib/apt/lists
 
-WORKDIR /usr/src/
-COPY . /usr/src/
+WORKDIR /root/
+COPY . /root/
 
 RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     python3 -m pip install --no-cache-dir -r requirements.txt && \
