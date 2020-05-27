@@ -1,7 +1,6 @@
 import json
 import argparse
 
-from valerie.utils import get_logger
 from valerie.scoring import validate_predictions_phase2, compute_detailed_score_phase2
 
 
