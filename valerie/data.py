@@ -175,12 +175,13 @@ def claims_from_phase2(claims_file):
 
     # remove "train_articles" string from related_articles keys
     for claim in claims.values():
+        if not claim.related_articles:
+            continue
         keys = list(claim.related_articles.keys())
         for old_name in keys:
             new_name = os.path.basename(old_name)
             claim.related_articles[new_name] = claim.related_articles.pop(old_name)
 
-    for claim in claims.values():
         for key in claim.related_articles:
             assert "train" not in key
 
