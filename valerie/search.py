@@ -1,7 +1,7 @@
+"""Search API query functions."""
 import os
 import logging
 
-import nltk
 import requests
 
 _logger = logging.getLogger(__name__)

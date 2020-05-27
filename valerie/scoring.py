@@ -1,3 +1,4 @@
+"""Official and modified scoring functions."""
 import json
 import numpy as np
 

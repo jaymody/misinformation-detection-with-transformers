@@ -1,6 +1,5 @@
-"""Utility functions."""
+"""Preprocessing."""
 import re
-import nltk
 import logging
 import unicodedata
 
@@ -50,11 +49,6 @@ def split(string, delimiters):
     """Split a string using multiple delimiters."""
     regexPattern = "|".join(map(re.escape, delimiters))
     return re.split(regexPattern, string)
-
-
-def split_sentences(text):
-    """Returns the input text split into a list of sentences."""
-    return [sentence.strip() for sentence in nltk.tokenize.sent_tokenize(text)]
 
 
 def clean_text(text, remove_punctuation=False):

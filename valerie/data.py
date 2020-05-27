@@ -1,4 +1,4 @@
-"""Data classes."""
+"""Data classes and loading functions."""
 import os
 import glob
 import json
