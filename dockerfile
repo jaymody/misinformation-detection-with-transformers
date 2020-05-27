@@ -21,4 +21,4 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip && \
     python3 -m nltk.downloader punkt && \
     python3 -m spacy download en_core_web_lg
 
-CMD [ "bash", "/usr/src/run" ]
+CMD [ "bash", "/root/run" ]
