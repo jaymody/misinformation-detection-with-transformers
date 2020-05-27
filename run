@@ -1,6 +1,6 @@
 #!/bin/bash
 
-SRC_DIR="/usr/src/"
+SRC_DIR="/root"
 ENVRC_FILE="${SRC_DIR}/.envrc"
 METADATA_FILE="/usr/local/dataset/metadata.json"
 PREDICTIONS_FILE="/usr/local/predictions.json"
