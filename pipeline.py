@@ -1,3 +1,4 @@
+import os
 import json
 import random
 import argparse
@@ -135,7 +136,7 @@ def select_related_articles(claims, responses, article_limit=2):
     # by the api score)
     all_articles = {}
 
-    for k, res in responses.items():
+    for k, res in tqdm(responses.items(), desc="Selecting Articles"):
         claim = claims[k]
         claim.related_articles = {}
 
@@ -237,21 +238,25 @@ if __name__ == "__main__":
     parser.add_argument("--claimant_model_file", type=str)
     parser.add_argument("--nproc", type=int)
     args = parser.parse_args()
-    nproc = 4
 
+    _logger.info("... reading claims from {} ...".format(args.metadata_file))
     claims = claims_from_phase2(args.metadata_file)
 
+    _logger.info("... getting query responses ...")
     responses = get_responses(claims, args.nproc)
 
+    _logger.info("... selecting related articles ...")
     articles = select_related_articles(claims, responses)
 
     # examples = create_examples(claims, articles)
     # seq_clf_features = sequence_classification()
 
+    _logger.info("... generating claimant predictions ...")
     predictions, explanations = claimant_classification(
         claims, args.claimant_model_file
     )
 
+    _logger.info("... compiling output ...")
     output = {}
     for k, claim in claims.items():
         pred = predictions[k]
@@ -275,5 +280,10 @@ if __name__ == "__main__":
             "explanation": explanation,
         }
 
+    _logger.info("... writing predictions to {} ...".format(args.predictions_file))
     with open(args.predictions_file, "w") as fo:
         json.dump(output, fo, indent=2)
+
+    if not os.path.exists(args.predictions_file):
+        raise ValueError("predictions file was not created")
+    _logger.info("... done ...")
