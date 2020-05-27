@@ -28,7 +28,7 @@ def claimant_classification(claims, claimant_model_file):
 
     predictions = {}
     explanations = {}
-    for k, claim in tqdm(claims.items(), desc="ClaimantModel Predictions"):
+    for k, claim in tqdm(claims.items(), desc="ClaimantModel predictions"):
         pred = claimant_model.predict(claim)
         if pred is None:
             predictions[k] = int(random.randint(0, 2))
@@ -136,7 +136,7 @@ def select_related_articles(claims, responses, article_limit=2):
     # by the api score)
     all_articles = {}
 
-    for k, res in tqdm(responses.items(), desc="Selecting Articles"):
+    for k, res in tqdm(responses.items(), desc="selecting articles"):
         claim = claims[k]
         claim.related_articles = {}
 
@@ -213,7 +213,7 @@ def get_responses(claims, nproc):
     for claim, query, res in tqdm(
         pool.imap_unordered(search_pipeline, claims.values()),
         total=len(claims),
-        desc="Getting Query Responses",
+        desc="fetching query responses",
     ):
         responses[claim.id] = {"id": claim.id, "res": res, "query": query}
     return responses
@@ -242,7 +242,7 @@ if __name__ == "__main__":
     _logger.info("... reading claims from {} ...".format(args.metadata_file))
     claims = claims_from_phase2(args.metadata_file)
 
-    _logger.info("... getting query responses ...")
+    _logger.info("... fetching query responses ...")
     responses = get_responses(claims, args.nproc)
 
     _logger.info("... selecting related articles ...")

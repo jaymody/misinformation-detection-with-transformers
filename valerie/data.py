@@ -169,7 +169,9 @@ def save_articles(filepath, articles, **kwargs):
 
 def claims_from_phase2(claims_file):
     with open(claims_file) as fi:
-        claims = {d["id"]: Claim(**d) for d in tqdm(json.load(fi))}
+        claims = {
+            d["id"]: Claim(**d) for d in tqdm(json.load(fi), desc="loading claims")
+        }
 
     # remove "train_articles" string from related_articles keys
     for claim in claims.values():
@@ -219,7 +221,9 @@ def articles_from_phase2(articles_dir, claims, nproc=1):
     pool = multiprocessing.Pool(nproc)
     articles = {}
     for art_id, article in tqdm(
-        pool.imap_unordered(_articles_from_phase2_visit, _inputs), total=len(fpaths)
+        pool.imap_unordered(_articles_from_phase2_visit, _inputs),
+        total=len(fpaths),
+        desc="loading articles",
     ):
         if art_id is not None:
             articles[art_id] = article
