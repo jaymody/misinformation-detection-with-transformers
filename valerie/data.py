@@ -2,7 +2,9 @@
 import os
 import glob
 import json
+import shutil
 import logging
+import collections
 import multiprocessing
 
 import bs4
@@ -230,3 +232,111 @@ def articles_from_phase2(articles_dir, claims, nproc=1):
             articles[art_id] = article
 
     return articles
+
+
+def _save_relevant_articles_phase2(metadata, articles_dir, output_dir):
+    # find set of relevant articles in trimmed down dataset
+    relevant_articles = set()
+    for d in metadata:
+        relevant_articles.update(
+            int(os.path.basename(n).split(".")[0]) for n in d["related_articles"]
+        )
+
+    # copy relevant articles to output directory
+    for fpath in tqdm(glob.glob(os.path.join(articles_dir, "*.html"))):
+        article_id = os.path.basename(fpath).split(".")[0]
+        if int(article_id) in relevant_articles:
+            shutil.copyfile(
+                fpath, os.path.join(output_dir, "articles", os.path.basename(fpath))
+            )
+
+    return len(relevant_articles)
+
+
+def train_test_split_phase2(
+    claims_file, articles_dir, train_dir, test_dir, train_size, random_state
+):
+    from sklearn.model_selection import train_test_split
+
+    if os.path.exists(train_dir):
+        raise ValueError("train_dir ({}) already exists".format(train_dir))
+    if os.path.exists(test_dir):
+        raise ValueError("test_dir ({}) already exists".format(test_dir))
+    os.makedirs(os.path.join(train_dir, "articles"))
+    os.makedirs(os.path.join(test_dir, "articles"))
+
+    with open(claims_file, "r") as fi:
+        metadata = json.load(fi)
+
+    # log args
+    _logger.info("claims_file:  %s", claims_file)
+    _logger.info("articles_dir: %s", articles_dir)
+    _logger.info("train_dir:    %s", train_dir)
+    _logger.info("test_dir:     %s", test_dir)
+    _logger.info("train_size:   %.2f", train_size)
+    _logger.info("random_state: %d", random_state)
+    _logger.info("")
+
+    # train_test_split
+    all_labels = [d["label"] for d in metadata]
+    training_data, testing_data, _, _ = train_test_split(
+        metadata,
+        all_labels,
+        stratify=all_labels,
+        train_size=train_size,
+        random_state=random_state,
+    )
+
+    # logging train test split
+    _logger.info("Num Total Claims:     %d", len(metadata))
+    _logger.info("Num Train Claims:     %d", len(training_data))
+    _logger.info("Num Test Claims:      %d", len(testing_data))
+    _logger.info("")
+    all_labels_count = collections.Counter(all_labels)
+    train_labels_count = collections.Counter([d["label"] for d in training_data])
+    test_labels_count = collections.Counter([d["label"] for d in testing_data])
+    _logger.info("All Labels Count:     %s", str(dict(all_labels_count)))
+    _logger.info("Train Labels Count:   %s", str(dict(train_labels_count)))
+    _logger.info("Test Labels Count:    %s", str(dict(test_labels_count)))
+    _logger.info("")
+
+    # articles
+    num_total_articles = len(glob.glob(os.path.join(articles_dir, "*.html")))
+    _logger.info("Num Total Articles:   %d", num_total_articles)
+    num_train_articles = _save_relevant_articles_phase2(
+        training_data, articles_dir, train_dir
+    )
+    _logger.info("Num Train Articles:   %d", num_train_articles)
+    num_test_articles = _save_relevant_articles_phase2(
+        testing_data, articles_dir, test_dir
+    )
+    _logger.info("Num Test Articles:    %d", num_test_articles)
+
+    # write metadata
+    with open(os.path.join(train_dir, "metadata.json"), "w") as fo:
+        json.dump(metadata, fo, indent=2)
+    with open(os.path.join(test_dir, "metadata.json"), "w") as fo:
+        json.dump(metadata, fo, indent=2)
+
+
+def trim_metadata_phase2(claims_file, articles_dir, output_dir, n_examples=None):
+    # if output_dir already exists, raise error, else make necessary dirs
+    if os.path.exists(output_dir):
+        raise ValueError("output_dir ({}) already exists".format(output_dir))
+    os.makedirs(os.path.join(output_dir, "articles"))
+
+    # load data
+    with open(claims_file, "r") as fi:
+        raw_data = json.load(fi)
+
+    # trim down dataset
+    _logger.info("orig len: %d", len(raw_data))
+    metadata = raw_data[:n_examples]
+    _logger.info("new len: %d", len(metadata))
+
+    num_articles = _save_relevant_articles_phase2(metadata, articles_dir, output_dir)
+    _logger.info("len relevant articles set: %d", num_articles)
+
+    # save trimmed down metadata.json to output directory
+    with open(os.path.join(output_dir, "metadata.json"), "w") as fo:
+        json.dump(metadata, fo, indent=2)
