@@ -168,6 +168,8 @@ def train(
         model_path=pretrained_model_name_or_path,
     )
 
+    return train_dataset, test_dataset, model
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Train sequence classifier.")
