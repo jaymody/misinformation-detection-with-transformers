@@ -200,8 +200,16 @@ class SequenceClassificationModel:
 
     def predict(self, predict_dataset, predict_batch_size=8):
         """Predict."""
+        # Trainer requires an output dir to be defined, which is created
+        # on init (if the folder doesn't already exist). Since we don't need
+        # an output dir, we just set it to a throwaway dir in the currrent
+        # directory. In addition, the default logging dir is runs, so to avoid
+        # it's creation, we route the logging dir to the throwaway dir
         args = SequenceClassificationTrainingArgs(
-            output_dir="", do_predict=True, eval_batch_size=predict_batch_size
+            output_dir="_tmp",
+            logging_dir="_tmp",
+            do_predict=True,
+            per_gpu_eval_batch_size=predict_batch_size,  # eval batch size is used for predict
         )
         trainer = Trainer(model=self.model, args=args)
         return trainer.predict(test_dataset=predict_dataset)
