@@ -314,9 +314,9 @@ def train_test_split_phase2(
 
     # write metadata
     with open(os.path.join(train_dir, "metadata.json"), "w") as fo:
-        json.dump(metadata, fo, indent=2)
+        json.dump(training_data, fo, indent=2)
     with open(os.path.join(test_dir, "metadata.json"), "w") as fo:
-        json.dump(metadata, fo, indent=2)
+        json.dump(testing_data, fo, indent=2)
 
 
 def trim_metadata_phase2(claims_file, articles_dir, output_dir, n_examples=None):
