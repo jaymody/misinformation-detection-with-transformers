@@ -1,4 +1,5 @@
 """Modeling."""
+import os
 import json
 import logging
 import collections
@@ -145,18 +146,23 @@ class SequenceClassificationModel:
     def from_pretrained(
         cls,
         pretrained_model_name_or_path,
+        checkpoint_dir="",
         config_args={},
         tokenizer_args={},
         model_args={},
     ):
-        config = AutoConfig.from_pretrained(
-            pretrained_model_name_or_path, **config_args
-        )
         tokenizer = AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path, **tokenizer_args
         )
+        config = AutoConfig.from_pretrained(
+            pretrained_model_name_or_path, **config_args
+        )
         model = AutoModelForSequenceClassification.from_pretrained(
-            pretrained_model_name_or_path, config=config, **model_args
+            os.path.join(pretrained_model_name_or_path, checkpoint_dir)
+            if checkpoint_dir
+            else pretrained_model_name_or_path,
+            config=config,
+            **model_args,
         )
         return cls(config, tokenizer, model)
 
@@ -179,6 +185,8 @@ class SequenceClassificationModel:
         model_path=None,
     ):
         compute_metrics = compute_metrics if compute_metrics else self.compute_metrics
+        self.tokenizer.save_pretrained(training_args.output_dir)
+        self.config.save_pretrained(training_args.output_dir)
         trainer = Trainer(
             model=self.model,
             args=training_args,
@@ -186,7 +194,9 @@ class SequenceClassificationModel:
             eval_dataset=test_dataset,
             compute_metrics=compute_metrics,
         )
-        return trainer.train(model_path=model_path)
+        _global_step, _tr_loss = trainer.train(model_path=model_path)
+        trainer.save_model(training_args.output_dir)
+        return _global_step, _tr_loss
 
     def predict(self, predict_dataset, predict_batch_size=8):
         """Predict."""
