@@ -134,7 +134,10 @@ def train(
         )
 
     model = SequenceClassificationModel.from_pretrained(
-        pretrained_model_name_or_path, config_args, tokenizer_args, model_args
+        pretrained_model_name_or_path,
+        config_args=config_args,
+        tokenizer_args=tokenizer_args,
+        model_args=model_args,
     )
 
     train_dataset = None
