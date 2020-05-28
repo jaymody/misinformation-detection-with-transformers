@@ -20,6 +20,12 @@ from valerie.preprocessing import clean_text
 
 _logger = get_logger()
 
+# global resources
+label_set = {0, 1, 2}
+id2label = {0: "false", 1: "partly true", 2: "true"}
+label2id = {"false": 0, "partly true": 1, "true": 2}
+number2place = {0: "first", 1: "second"}
+
 _logger.info("... loading spacy ...")
 nlp = spacy.load("en_core_web_lg")
 
@@ -36,17 +42,37 @@ def claimant_classification(claims, claimant_model_file):
         pred = claimant_model.predict(claim)
         if pred is None:
             predictions[k] = int(random.randint(0, 2))
-            explanations[k] = "Claimant not found in ClaimantModel."
+            explanations[k] = ""
+            continue
+
+        pred = int(np.argmax(pred))
+        assert pred in label_set, pred
+        predictions[k] = pred
+
+        if pred == 0:
+            explanations[k] = (
+                "The claimant has a history of misinformation, having previously "
+                "made {} (out of {}) false statements.".format(
+                    claimant_model.model[claim.claimant]["false"],
+                    claimant_model.model[claim.claimant]["total"],
+                )
+            )
+        elif pred == 1:
+            explanations[k] = (
+                "The claimant has a mixed record, having previously made "
+                "{} (out of {}) partially correct/incorrect statements.".format(
+                    claimant_model.model[claim.claimant]["partly"],
+                    claimant_model.model[claim.claimant]["total"],
+                )
+            )
         else:
-            pred = int(np.argmax(pred))
-            predictions[k] = pred
-            if pred == 0:
-                explanations[k] = "The claimant has a record of lying."
-            elif pred == 1:
-                explanations[k] = "The claimant has mixed record."
-            else:
-                explanations[k] = "The claimant has a good record."
-            explanations[k] += json.dumps(claimant_model.model[claim.claimant])
+            explanations[k] = (
+                "The claimant has a good track record, having previously made "
+                "{} (out of {}) factual statements.".format(
+                    claimant_model.model[claim.claimant]["true"],
+                    claimant_model.model[claim.claimant]["total"],
+                )
+            )
 
     return predictions, explanations
 
@@ -88,8 +114,25 @@ def sequence_classification(
     explanations = {}
     for example, prob in zip(examples, probabilities):
         pred = int(np.argmax(prob))
+        assert pred in label_set, pred
         predictions[example.guid] = pred
-        explanations[example.guid] = "Transformer model output = {}.".format(pred)
+
+        if pred == 0:
+            explanations[example.guid] = (
+                "I have detected patterns in the claim consitent with "
+                "misinformation."
+            )
+        elif pred == 1:
+            explanations[example.guid] = (
+                "I have detected patterns in the claim consitent with "
+                "clickbait and partial truth."
+            )
+        else:
+            explanations[example.guid] = (
+                "I couldn't detect any patterns in the claim "
+                "consitent with misinformation, clickbait, disinformation, or "
+                "fake news, suggesting that the claim may be true."
+            )
 
     return predictions, explanations
 
@@ -254,17 +297,12 @@ if __name__ == "__main__":
     _logger.info("... compiling output ...")
     output = {}
     for k, claim in claims.items():
+        # label (predicted)
         pred = seq_clf_predictions[k]
         assert isinstance(pred, int)
-        assert pred in [0, 1, 2]
+        assert pred in label_set
 
-        explanation = seq_clf_explanations[k]
-        if claimant_predictions[k] == pred:
-            explanation += claimant_explanations[k]
-        explanation = explanation[:999]
-        assert isinstance(explanation, str)
-        assert len(explanation) < 1000
-
+        # related articles
         related_articles = list(claim.related_articles.keys())
         related_articles = related_articles[:2]
         assert isinstance(related_articles, list)
@@ -272,6 +310,23 @@ if __name__ == "__main__":
         for rel_art in related_articles:
             assert isinstance(rel_art, str)
 
+        # explanation
+        explanation = []
+        for i, rel_art in enumerate(related_articles):
+            explanation.append(
+                "The claim is {} as seen in the {} article.".format(
+                    id2label[pred], number2place[i + 1]
+                )
+            )
+        if claimant_predictions[k] == pred:
+            explanation.append(claimant_explanations[k])
+        explanation.append(seq_clf_explanations[k])
+        explanation = " ".join(explanation)
+        explanation = explanation[:999]
+        assert isinstance(explanation, str)
+        assert len(explanation) < 1000
+
+        # final predictions
         output[k] = {
             "label": pred,
             "related_articles": related_articles,
