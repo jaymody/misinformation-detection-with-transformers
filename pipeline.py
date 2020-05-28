@@ -11,7 +11,11 @@ from tqdm import tqdm
 from valerie import search
 from valerie.data import claims_from_phase2, Article
 from valerie.utils import get_logger
-from valerie.modeling import ClaimantModel
+from valerie.modeling import (
+    ClaimantModel,
+    SequenceClassificationExample,
+    SequenceClassificationModel,
+)
 from valerie.preprocessing import clean_text
 
 _logger = get_logger()
@@ -49,94 +53,61 @@ def claimant_classification(claims, claimant_model_file):
 
 ########## Sequence Classification ##########
 
-# # from train.py
-# def get_args_files(output_dir):
-#     if not os.path.exists(output_dir):
-#         raise ValueError(f"output dir does not exists: {output_dir}")
 
-#     args_files = {
-#         "config_args_file": os.path.join(output_dir, "config_args.json"),
-#         "tokenizer_args_file": os.path.join(output_dir, "tokenizer_args.json"),
-#         "model_args_file": os.path.join(output_dir, "model_args.json"),
-#     }
-#     for k, v in args_files.items():
-#         if not os.path.exists(v):
-#             raise ValueError(f"could not find {k}: {v}")
+def _sequence_classification(
+    examples, pretrained_model_name_or_path, predict_batch_size, nproc,
+):
+    model = SequenceClassificationModel.from_pretrained(pretrained_model_name_or_path)
 
-#     return args_files
+    predict_dataset = model.create_dataset(examples=examples, nproc=nproc)
+    prediction_output = model.predict(predict_dataset, predict_batch_size)
+
+    # returns an array of probs
+    probabilities = prediction_output.predictions
+    return probabilities
 
 
-# def _sequence_classification(
-#     examples,
-#     pretrained_model_name_or_path,
-#     config_args_file,
-#     tokenizer_args_file,
-#     model_args_file,
-#     predict_batch_size,
-#     nproc,
-# ):
-#     config_args = {}
-#     tokenizer_args = {}
-#     model_args = {}
-#     if config_args_file:
-#         with open(config_args_file) as fi:
-#             config_args = json.load(fi)
-#     if tokenizer_args_file:
-#         with open(tokenizer_args_file) as fi:
-#             tokenizer_args = json.load(fi)
-#     if model_args_file:
-#         with open(model_args_file) as fi:
-#             model_args = json.load(fi)
+def sequence_classification(
+    examples, pretrained_model_name_or_path, predict_batch_size, nproc
+):
+    probabilities = _sequence_classification(
+        examples,
+        pretrained_model_name_or_path,
+        predict_batch_size=predict_batch_size,
+        nproc=nproc,
+    )
 
-#     with open(data_args_file) as fi:
-#         data_args = DataArguments(**json.load(fi))
-#     with open(training_args_file) as fi:
-#         training_args = SequenceClassificationTrainingArgs(
-#             output_dir=output_dir, logging_dir=output_dir, **json.load(fi)
-#         )
+    if len(probabilities) != len(examples):
+        raise ValueError(
+            "len predictions ({}) != len examples ({})".format(
+                len(probabilities), len(examples)
+            )
+        )
 
-#     model = SequenceClassificationModel.from_pretrained(
-#         pretrained_model_name_or_path, config_args, tokenizer_args, model_args
-#     )
+    predictions = {}
+    explanations = {}
+    for example, prob in zip(examples, probabilities):
+        pred = int(np.argmax(prob))
+        predictions[example.guid] = pred
+        explanations[example.guid] = "Transformer model output = {}.".format(pred)
 
-#     predict_dataset = model.create_dataset(examples=examples, nproc=nproc)
-#     predictions = model.predict(predict_dataset, predict_batch_size)
-
-
-# def sequence_classification(
-#     examples, pretrained_model_name_or_path, predict_batch_size, nproc
-# ):
-#     args_files = get_args_files(pretrained_model_name_or_path)
-#     _predict(
-#         examples,
-#         pretrained_model_name_or_path,
-#         **args_files,
-#         predict_batch_size=predict_batch_size,
-#         nproc=nproc,
-#     )
-
-#     # returns a dict of claim ids with their associated classification output probs/features
+    return predictions, explanations
 
 
 ########## Generate Examples ##########
 
 
-# def _generate_examples(claim):
-#     claim_doc = nlp(claim.claim, disable=["textcat", "tagger", "parser", "ner"])
+def generate_examples(claims):
+    examples = []
 
-#     for k, article in related_articles.items():
-#         article_doc = nlp(
-#             article.title + article.content,
-#             disable=["textcat", "tagger", "parser", "ner"],
-#         )
-#         # continue from here
+    for k, claim in tqdm(claims.items(), desc="generating examples"):
+        examples.append(
+            SequenceClassificationExample(
+                guid=k, text_a=claim.claim, label=claim.label,
+            )
+        )
 
-
-# def generate_examples(claims, nproc):
-#     pool = multiprocessing.Pool(nproc)
-
-#     for claim in claims:
-#         pass
+    return examples
 
 
 ########## Related Articles ##########
@@ -253,7 +224,9 @@ if __name__ == "__main__":
     parser.add_argument("--metadata_file", type=str)
     parser.add_argument("--predictions_file", type=str)
     parser.add_argument("--claimant_model_file", type=str)
-    parser.add_argument("--nproc", type=int)
+    parser.add_argument("--pretrained_model_name_or_path", type=str)
+    parser.add_argument("--predict_batch_size", type=int, default=1)
+    parser.add_argument("--nproc", type=int, default=1)
     args = parser.parse_args()
 
     _logger.info("... reading claims from {} ...".format(args.metadata_file))
@@ -265,24 +238,32 @@ if __name__ == "__main__":
     _logger.info("... selecting related articles ...")
     articles = select_related_articles(claims, responses)
 
-    # examples = create_examples(claims, articles)
-    # seq_clf_features = sequence_classification()
+    examples = generate_examples(claims)
+    seq_clf_predictions, seq_clf_explanations = sequence_classification(
+        examples,
+        args.pretrained_model_name_or_path,
+        args.predict_batch_size,
+        args.nproc,
+    )
 
     _logger.info("... generating claimant predictions ...")
-    predictions, explanations = claimant_classification(
+    claimant_predictions, claimant_explanations = claimant_classification(
         claims, args.claimant_model_file
     )
 
     _logger.info("... compiling output ...")
     output = {}
     for k, claim in claims.items():
-        pred = predictions[k]
+        pred = seq_clf_predictions[k]
         assert isinstance(pred, int)
         assert pred in [0, 1, 2]
 
-        explanation = explanations[k]
+        explanation = seq_clf_explanations[k]
+        if claimant_predictions[k] == pred:
+            explanation += claimant_explanations[k]
         explanation = explanation[:999]
         assert isinstance(explanation, str)
+        assert len(explanation) < 1000
 
         related_articles = list(claim.related_articles.keys())
         related_articles = related_articles[:2]
@@ -292,7 +273,7 @@ if __name__ == "__main__":
             assert isinstance(rel_art, str)
 
         output[k] = {
-            "label": predictions[k],
+            "label": pred,
             "related_articles": related_articles,
             "explanation": explanation,
         }
