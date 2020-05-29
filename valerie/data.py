@@ -146,7 +146,7 @@ def load_claims(filepath, as_list=False, verbose=True):
     return claims
 
 
-def save_claims(filepath, claims, **kwargs):
+def save_claims(claims, filepath, **kwargs):
     with open(filepath, "w") as fo:
         json.dump({k: v.to_dict() for k, v in claims.items()}, fo, **kwargs)
 
@@ -165,7 +165,7 @@ def load_articles(filepath, as_list=False, verbose=True):
     return articles
 
 
-def save_articles(filepath, articles, **kwargs):
+def save_articles(articles, filepath, **kwargs):
     with open(filepath, "w") as fo:
         json.dump({k: v.to_dict() for k, v in articles.items()}, fo, **kwargs)
 
