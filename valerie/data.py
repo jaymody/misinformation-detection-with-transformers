@@ -170,10 +170,11 @@ def save_articles(articles, filepath, **kwargs):
         json.dump({k: v.to_dict() for k, v in articles.items()}, fo, **kwargs)
 
 
-def claims_from_phase2(claims_file):
-    with open(claims_file) as fi:
+def claims_from_phase2(metadata_file):
+    with open(metadata_file) as fi:
         claims = {
-            d["id"]: Claim(**d) for d in tqdm(json.load(fi), desc="loading claims")
+            d["id"]: Claim(**d)
+            for d in tqdm(json.load(fi), desc="loading claims from phase2")
         }
 
     # remove "train_articles" string from related_articles keys
@@ -227,7 +228,7 @@ def articles_from_phase2(articles_dir, claims, nproc=1):
     for art_id, article in tqdm(
         pool.imap_unordered(_articles_from_phase2_visit, _inputs),
         total=len(fpaths),
-        desc="loading articles",
+        desc="loading article from phase2",
     ):
         if art_id is not None:
             articles[art_id] = article
