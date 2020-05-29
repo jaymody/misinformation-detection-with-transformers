@@ -94,8 +94,9 @@ class Article:
     @classmethod
     def from_txt(cls, id, text, **kwargs):
         """Construct an Article given text."""
+        title = text.partition("\n")[0]
         text = clean_text(text)
-        return cls(id, content=text, **kwargs)
+        return cls(id, content=text, title=title, **kwargs)
 
     @classmethod
     def from_html(cls, id, html, **kwargs):
