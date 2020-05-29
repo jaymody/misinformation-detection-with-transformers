@@ -142,30 +142,6 @@ class SequenceClassificationModel:
         self.tokenizer = tokenizer
         self.model = model
 
-    @classmethod
-    def from_pretrained(
-        cls,
-        pretrained_model_name_or_path,
-        checkpoint_dir="",
-        config_args={},
-        tokenizer_args={},
-        model_args={},
-    ):
-        tokenizer = AutoTokenizer.from_pretrained(
-            pretrained_model_name_or_path, **tokenizer_args
-        )
-        config = AutoConfig.from_pretrained(
-            pretrained_model_name_or_path, **config_args
-        )
-        model = AutoModelForSequenceClassification.from_pretrained(
-            os.path.join(pretrained_model_name_or_path, checkpoint_dir)
-            if checkpoint_dir
-            else pretrained_model_name_or_path,
-            config=config,
-            **model_args,
-        )
-        return cls(config, tokenizer, model)
-
     def create_dataset(self, examples=None, cached_features_file=None, nproc=1):
         label_list = list(self.config.label2id.values())
         return SequenceClassificationDataset(
@@ -213,6 +189,89 @@ class SequenceClassificationModel:
         )
         trainer = Trainer(model=self.model, args=args)
         return trainer.predict(test_dataset=predict_dataset)
+
+    @classmethod
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path,
+        checkpoint_dir="",
+        config_args={},
+        tokenizer_args={},
+        model_args={},
+    ):
+        tokenizer = AutoTokenizer.from_pretrained(
+            pretrained_model_name_or_path, **tokenizer_args
+        )
+        config = AutoConfig.from_pretrained(
+            pretrained_model_name_or_path, **config_args
+        )
+        model = AutoModelForSequenceClassification.from_pretrained(
+            os.path.join(pretrained_model_name_or_path, checkpoint_dir)
+            if checkpoint_dir
+            else pretrained_model_name_or_path,
+            config=config,
+            **model_args,
+        )
+        return cls(config, tokenizer, model)
+
+    @classmethod
+    def train_from_pretrained(
+        cls,
+        output_dir,
+        pretrained_model_name_or_path,
+        train_examples,
+        test_examples=None,
+        data_args={},
+        training_args={},
+        config_args={},
+        tokenizer_args={},
+        model_args={},
+        compute_metrics=None,
+        nproc=1,
+    ):
+        os.makedirs(output_dir)
+        with open(os.path.join(output_dir, "data_args.json"), "w") as fo:
+            json.dump(data_args, fo, indent=2)
+        with open(os.path.join(output_dir, "training_args.json"), "w") as fo:
+            json.dump(training_args, fo, indent=2)
+        with open(os.path.join(output_dir, "config_args.json"), "w") as fo:
+            json.dump(config_args, fo, indent=2)
+        with open(os.path.join(output_dir, "tokenizer_args.json"), "w") as fo:
+            json.dump(tokenizer_args, fo, indent=2)
+        with open(os.path.join(output_dir, "model_args.json"), "w") as fo:
+            json.dump(model_args, fo, indent=2)
+
+        model = cls.from_pretrained(
+            pretrained_model_name_or_path,
+            config_args=config_args,
+            tokenizer_args=tokenizer_args,
+            model_args=model_args,
+        )
+
+        train_dataset = model.create_dataset(examples=train_examples, nproc=nproc)
+        test_dataset = model.create_dataset(examples=test_examples, nproc=nproc)
+
+        training_args = SequenceClassificationTrainingArgs(
+            output_dir=output_dir, logging_dir=output_dir, **training_args
+        )
+
+        _global_step, _tr_loss = model.train(
+            train_dataset=train_dataset,
+            test_dataset=test_dataset,
+            training_args=training_args,
+            model_path=pretrained_model_name_or_path,
+            compute_metrics=compute_metrics,
+        )
+
+        return model, train_dataset, test_dataset
+
+    @staticmethod
+    def load_examples(examples_file):
+        with open(examples_file) as fi:
+            examples = [
+                SequenceClassificationExample(**example) for example in json.load(fi)
+            ]
+        return examples
 
     @staticmethod
     def compute_metrics(results):
