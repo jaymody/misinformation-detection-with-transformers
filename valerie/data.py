@@ -236,6 +236,51 @@ def articles_from_phase2(articles_dir, claims, nproc=1):
     return articles
 
 
+def claims_from_phase1(metadata_file):
+    with open(metadata_file) as fi:
+        claims = {
+            d["id"]: Claim(**d)
+            for d in tqdm(json.load(fi), desc="loading claims from phase1")
+        }
+
+    for claim in claims.values():
+        if not claim.related_articles:
+            raise ValueError("claim {} has no related articles".format(claim.id))
+
+        related_articles_dict = {}
+        for rel_art in claim.related_articles:
+            rel_art = str(rel_art) + ".txt"  # use full filename as id
+            related_articles_dict[rel_art] = None
+        claim.related_articles = related_articles_dict
+
+    return claims
+
+
+def _articles_from_phase1_visit(fpath):
+    with open(fpath) as fi:
+        art_id = os.path.basename(fpath)
+        article = Article.from_txt(art_id, fi.read())
+    return art_id, article
+
+
+def articles_from_phase1(articles_dir, nproc=1):
+    # note 1994 articles exists in the phase1 dataset that aren't a related
+    # article for any of the claims, but we keep them as it's extra data we
+    # may use in a corpus or something
+    fpaths = glob.glob(os.path.join(articles_dir, "*.txt"))
+
+    pool = multiprocessing.Pool(nproc)
+    articles = {}
+    for art_id, article in tqdm(
+        pool.imap_unordered(_articles_from_phase1_visit, fpaths),
+        total=len(fpaths),
+        desc="loading articles from phase1",
+    ):
+        articles[art_id] = article
+
+    return articles
+
+
 def _save_relevant_articles_phase2(metadata, articles_dir, output_dir):
     # find set of relevant articles in trimmed down dataset
     relevant_articles = set()
