@@ -5,7 +5,9 @@ data/
 legal/
 info/
 models/
-run_*
+run_compile
+run_vm
+run_linting
 todo.txt
 _tmp/
 _*.ipynb
