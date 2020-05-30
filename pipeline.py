@@ -26,6 +26,14 @@ label_set = {0, 1, 2}
 id2label = {0: "false", 1: "partly true", 2: "true"}
 label2id = {"false": 0, "partly true": 1, "true": 2}
 number2place = {1: "first", 2: "second"}
+furthermore_syns = [
+    "In addition",
+    "Furthermore",
+    "Consequently",
+    "Additionaly",
+    "Moreover",
+]
+
 
 _logger.info("... loading spacy ...")
 nlp = spacy.load("en_core_web_lg")
@@ -52,7 +60,7 @@ def claimant_classification(claims, claimant_model_file):
 
         if pred == 0:
             explanations[k] = (
-                "This is supported by the fact that the claimant has a history "
+                "This is also supported by the fact that the claimant has a history "
                 "of misinformation, having previously made {} (out of {}) "
                 "false statements.".format(
                     claimant_model.model[claim.claimant]["false"],
@@ -61,7 +69,7 @@ def claimant_classification(claims, claimant_model_file):
             )
         elif pred == 1:
             explanations[k] = (
-                "This is supported by the fact that the claimant has a mixed "
+                "This is also supported by the fact that the claimant has a mixed "
                 "record, having previously made {} (out of {}) partially "
                 "correct/incorrect statements.".format(
                     claimant_model.model[claim.claimant]["partly"],
@@ -70,7 +78,7 @@ def claimant_classification(claims, claimant_model_file):
             )
         else:
             explanations[k] = (
-                "This is supported by the fact that the claimant has a good "
+                "This is also supported by the fact that the claimant has a good "
                 "track record, having previously made "
                 "{} (out of {}) factual statements.".format(
                     claimant_model.model[claim.claimant]["true"],
@@ -123,19 +131,19 @@ def sequence_classification(
 
         if pred == 0:
             explanations[example.guid] = (
-                "I have detected patterns in the claim consitent with "
+                "The transformer model detected patterns in the claim consitent with "
                 "misinformation."
             )
         elif pred == 1:
             explanations[example.guid] = (
-                "I have detected patterns in the claim consitent with "
-                "clickbait and partial truth."
+                "The transformer model detected patterns in the claim consitent with "
+                "clickbait and/or partial truth."
             )
         else:
             explanations[example.guid] = (
-                "I couldn't detect any patterns in the claim "
+                "The transformer model couldn't detect any patterns in the claim "
                 "consitent with misinformation, clickbait, disinformation, or "
-                "fake news, suggesting that the claim may be true."
+                "fake news, suggesting that the claim is likely true."
             )
 
     return predictions, explanations
@@ -145,7 +153,10 @@ def sequence_classification(
 
 
 def _generate_support(claim, n_examples=4):
-    claim_doc = nlp(claim.claim, disable=["textcat", "tagger", "parser", "ner"])
+    claim_text = claim.claim
+    if claim.claimant is not None:
+        claim_text += claim.claimant
+    claim_doc = nlp(claim_text, disable=["textcat", "tagger", "parser", "ner"],)
 
     support = []
     for k in claim.related_articles:
@@ -202,7 +213,6 @@ def generate_single_claim_claimant_examples(claims):
 
 
 def select_related_articles(claims, responses, article_limit=2):
-    # currently, articles are sorted by api score
     # atm, the most succesful strategy for picking related articles
     # scored by the automated algorithm is using only the api score
     # (we select top article_limit articles since the response hits are sorted
@@ -315,7 +325,10 @@ if __name__ == "__main__":
     articles = select_related_articles(claims, responses)
 
     _logger.info("... generating support ...")
-    support = generate_support(claims, nproc=args.nproc)
+    try:
+        support = generate_support(claims, nproc=args.nproc)
+    except:
+        support = {}
 
     _logger.info("... generating examples ...")
     examples = generate_single_claim_claimant_examples(claims)
@@ -352,33 +365,47 @@ if __name__ == "__main__":
         # explanation
         explanation = []
 
-        n_support_exp = 0
-        max_support_exp = 3
-        for sup in support[k]:
-            for i, rel_art in enumerate(related_articles):
-                if sup["art_id"] != rel_art or n_support_exp > max_support_exp:
-                    continue
+        first_source = None
+        try:
+            for sup in support[k]:
+                for i, rel_art in enumerate(related_articles):
+                    if (
+                        len(explanation) >= 2
+                        or sup["art_id"] != rel_art
+                        or sup["similarity"] < 0.8
+                    ):
+                        continue
 
-                if articles[rel_art].source:
-                    exp = (
-                        "The claim is {}, which is confirmed by {} in the {} "
-                        'article, stating "{}".'.format(
-                            id2label[pred],
-                            articles[rel_art].source,
-                            number2place[i + 1],
-                            sup["text"],
-                        )
-                    )
-                else:
-                    exp = (
-                        "The claim is {}, which is confirmed by the {} "
-                        'article, stating "{}".'.format(
-                            id2label[pred], number2place[i + 1], sup["text"],
-                        )
-                    )
+                    sup_text = sup["text"]
+                    if len(sup_text) > 340:
+                        sup_text = sup_text[:335] + " ..."
 
-                explanation.append(exp)
-                n_support_exp += 1
+                    art = articles[rel_art]
+                    if len(explanation) == 0:
+                        explanation.append(
+                            "The claim is {}, as explained in the {} "
+                            'article, which states "{}".'.format(
+                                id2label[pred], number2place[i + 1], sup_text,
+                            )
+                        )
+                        first_source = art.source
+                    elif art.source == first_source and first_source is not None:
+                        explanation.append(
+                            '{}, the article goes on to say "{}".'.format(
+                                random.choice(furthermore_syns), sup_text,
+                            )
+                        )
+                    else:
+                        explanation.append(
+                            "This conclusion is also confirmed by the {} article{}, "
+                            '"{}".'.format(
+                                number2place[i + 1],
+                                " from " + art.source if art.source else "",
+                                sup_text[:400],
+                            )
+                        )
+        except:
+            explanation = []
 
         # backup default explanation
         if not explanation:
