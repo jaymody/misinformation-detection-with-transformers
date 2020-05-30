@@ -15,12 +15,17 @@ SEARCH_API_URL = "http://lpsa.wrw.org/claimserver/api/v1.0/evidence"
 
 
 def query(query_string, from_idx=0):
-    resp = requests.get(
-        SEARCH_API_URL,
-        headers={"X-Api-Key": API_KEY},
-        params={"query": query_string, "from": from_idx},
-    )
-    if resp.status_code == requests.codes.ok:  # pylint: disable=no-member
-        return resp.json()
-    else:
+    try:
+        resp = requests.get(
+            SEARCH_API_URL,
+            headers={"X-Api-Key": API_KEY},
+            params={"query": query_string, "from": from_idx},
+        )
+        if resp.status_code == requests.codes.ok:  # pylint: disable=no-member
+            return resp.json()
+        else:
+            _logger.debug("response status was not ok for query %s", query_string)
+            return None
+    except Exception as e:
+        _logger.debug("api call failed: %s", e)
         return None
