@@ -1,5 +1,6 @@
 import os
 import json
+import heapq
 import random
 import argparse
 import multiprocessing
@@ -24,7 +25,7 @@ _logger = get_logger()
 label_set = {0, 1, 2}
 id2label = {0: "false", 1: "partly true", 2: "true"}
 label2id = {"false": 0, "partly true": 1, "true": 2}
-number2place = {0: "first", 1: "second"}
+number2place = {1: "first", 2: "second"}
 
 _logger.info("... loading spacy ...")
 nlp = spacy.load("en_core_web_lg")
@@ -51,23 +52,26 @@ def claimant_classification(claims, claimant_model_file):
 
         if pred == 0:
             explanations[k] = (
-                "The claimant has a history of misinformation, having previously "
-                "made {} (out of {}) false statements.".format(
+                "This is supported by the fact that the claimant has a history "
+                "of misinformation, having previously made {} (out of {}) "
+                "false statements.".format(
                     claimant_model.model[claim.claimant]["false"],
                     claimant_model.model[claim.claimant]["total"],
                 )
             )
         elif pred == 1:
             explanations[k] = (
-                "The claimant has a mixed record, having previously made "
-                "{} (out of {}) partially correct/incorrect statements.".format(
+                "This is supported by the fact that the claimant has a mixed "
+                "record, having previously made {} (out of {}) partially "
+                "correct/incorrect statements.".format(
                     claimant_model.model[claim.claimant]["partly"],
                     claimant_model.model[claim.claimant]["total"],
                 )
             )
         else:
             explanations[k] = (
-                "The claimant has a good track record, having previously made "
+                "This is supported by the fact that the claimant has a good "
+                "track record, having previously made "
                 "{} (out of {}) factual statements.".format(
                     claimant_model.model[claim.claimant]["true"],
                     claimant_model.model[claim.claimant]["total"],
@@ -140,16 +144,57 @@ def sequence_classification(
 ########## Generate Examples ##########
 
 
-def generate_examples(claims):
-    examples = []
+def _generate_support(claim, n_examples=4):
+    claim_doc = nlp(claim.claim, disable=["textcat", "tagger", "parser", "ner"])
 
+    support = []
+    for k in claim.related_articles:
+        article = articles[k]
+        if not article.content:
+            continue
+        _title = article.title if article.title else ""
+        article_doc = nlp(
+            _title + article.content, disable=["textcat", "tagger", "ner"],
+        )
+
+        for sentence in article_doc.sents:
+            if not np.count_nonzero(sentence.vector):
+                continue
+            support.append(
+                {
+                    "similarity": claim_doc.similarity(sentence),
+                    "art_id": article.id,
+                    "text": sentence.text,
+                }
+            )
+    support = heapq.nlargest(n_examples, support, key=lambda x: x["similarity"])
+    return claim, support
+
+
+def generate_support(claims, nproc):
+    pool = multiprocessing.Pool(nproc)
+
+    all_support = {}
+    for claim, support in tqdm(
+        pool.imap_unordered(_generate_support, claims.values()),
+        total=len(claims.values()),
+        desc="generating support",
+    ):
+        all_support[claim.id] = support
+    return all_support
+
+
+def generate_single_claim_claimant_examples(claims):
+    examples = []
     for k, claim in tqdm(claims.items(), desc="generating examples"):
         examples.append(
             SequenceClassificationExample(
-                guid=k, text_a=claim.claim, label=claim.label,
+                guid=k,
+                text_a=claim.claim,
+                text_b=claim.claimant if claim.claimant else "no claimant",
+                label=claim.label,
             )
         )
-
     return examples
 
 
@@ -251,19 +296,7 @@ def get_responses(claims, nproc):
 
 
 if __name__ == "__main__":
-    # load claims
-    # run queries
-    # choose related articles
-    # make predictions
-    # generate sequence classification examples
-    #   generate sequence classification predictions
-    #   generate claimant predictions
-    #   combine predictions for final predictions
-    #   form explanation (the claimant has a history of lying... this sentence
-    #   from the following article states ... which means ... see x article)
-    # write predictions to file
-
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser("Main pipeline for the phase2 submission.")
     parser.add_argument("--metadata_file", type=str)
     parser.add_argument("--predictions_file", type=str)
     parser.add_argument("--claimant_model_file", type=str)
@@ -281,7 +314,13 @@ if __name__ == "__main__":
     _logger.info("... selecting related articles ...")
     articles = select_related_articles(claims, responses)
 
-    examples = generate_examples(claims)
+    _logger.info("... generating support ...")
+    support = generate_support(claims, nproc=args.nproc)
+
+    _logger.info("... generating examples ...")
+    examples = generate_single_claim_claimant_examples(claims)
+
+    _logger.info("... generating sequence classification predictions ...")
     seq_clf_predictions, seq_clf_explanations = sequence_classification(
         examples,
         args.pretrained_model_name_or_path,
@@ -312,16 +351,46 @@ if __name__ == "__main__":
 
         # explanation
         explanation = []
-        for i, rel_art in enumerate(related_articles):
-            explanation.append(
-                "The claim is {} as seen in the {} article.".format(
-                    id2label[pred], number2place[i + 1]
-                )
-            )
+
+        n_support_exp = 0
+        max_support_exp = 3
+        for sup in support[k]:
+            for i, rel_art in enumerate(related_articles):
+                if sup["art_id"] != rel_art or n_support_exp > max_support_exp:
+                    continue
+
+                if articles[rel_art].source:
+                    exp = (
+                        "The claim is {}, which is confirmed by {} in the {} "
+                        'article, stating "{}".'.format(
+                            id2label[pred],
+                            articles[rel_art].source,
+                            number2place[i + 1],
+                            sup["text"],
+                        )
+                    )
+                else:
+                    exp = (
+                        "The claim is {}, which is confirmed by the {} "
+                        'article, stating "{}".'.format(
+                            id2label[pred], number2place[i + 1], sup["text"],
+                        )
+                    )
+
+                explanation.append(exp)
+                n_support_exp += 1
+
+        # backup default explanation
+        if not explanation:
+            explanation.append(seq_clf_explanations[k])
+
         if claimant_predictions[k] == pred:
             explanation.append(claimant_explanations[k])
-        explanation.append(seq_clf_explanations[k])
+
+        explanation = [e for e in explanation if e]
         explanation = " ".join(explanation)
+        if len(explanation) > 995:
+            explanation = explanation[:995] + " ..."
         explanation = explanation[:999]
         assert isinstance(explanation, str)
         assert len(explanation) < 1000
