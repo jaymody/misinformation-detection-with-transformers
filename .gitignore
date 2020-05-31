@@ -9,7 +9,7 @@ models/
 run_compile
 run_vm
 run_linting
-todo.txt
+todo.md
 _tmp/
 _*.ipynb
 .envrc
