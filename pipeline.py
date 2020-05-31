@@ -372,7 +372,7 @@ if __name__ == "__main__":
                     if (
                         len(explanation) >= 2
                         or sup["art_id"] != rel_art
-                        or sup["similarity"] < 0.87
+                        or sup["similarity"] < 0.80
                     ):
                         continue
 
