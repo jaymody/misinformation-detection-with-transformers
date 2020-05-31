@@ -131,17 +131,17 @@ def sequence_classification(
 
         if pred == 0:
             explanations[example.guid] = (
-                "The transformer model detected patterns in the claim consitent with "
+                "The AI model detected patterns in the claim consitent with "
                 "misinformation."
             )
         elif pred == 1:
             explanations[example.guid] = (
-                "The transformer model detected patterns in the claim consitent with "
+                "The AI model detected patterns in the claim consitent with "
                 "clickbait and/or partial truth."
             )
         else:
             explanations[example.guid] = (
-                "The transformer model couldn't detect any patterns in the claim "
+                "The AI model couldn't detect any patterns in the claim "
                 "consitent with misinformation, clickbait, disinformation, or "
                 "fake news, suggesting that the claim is likely true."
             )
