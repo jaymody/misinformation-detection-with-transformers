@@ -119,7 +119,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", type=str)
     parser.add_argument(
-        "--claims_file", type=str, default="data/phase2/all_data/claims.json"
+        "--claims_file", type=str, default="data/phase2/all-data/claims.json"
     )
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--n_samples", type=int, default=1000)
