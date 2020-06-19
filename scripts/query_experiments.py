@@ -148,7 +148,7 @@ if __name__ == "__main__":
     run_claims = random.sample(list(claims.values()), args.n_samples)
     run_configs = run_config_combinations(args.query_params)
 
-    output = []
+    output = {}
     for i, run_config in enumerate(run_configs):
         _logger.info(f"run {i}".center(50, "-"))
         _logger.info("config: %s", json.dumps(run_config, indent=2))
@@ -162,7 +162,7 @@ if __name__ == "__main__":
         scores = compute_query_score(responses, claims)
         _logger.info("scores: %s", json.dumps(scores, indent=2))
 
-        output.append({i: {"config": run_config, "scores": scores}})
+        output[i] = {"config": run_config, "scores": scores}
 
     with open(os.path.join(args.output_dir, "results.json"), "w") as fo:
         json.dump(output, fo, indent=2)
