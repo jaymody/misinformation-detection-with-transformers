@@ -1,4 +1,5 @@
 import json
+import argparse
 import multiprocessing
 
 import spacy
@@ -110,18 +111,28 @@ def pipeline(claim):
 
 
 if __name__ == "__main__":
-    claims = load_claims("data/phase2/all_data/claims.json")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output_file", type=str)
+    parser.add_argument(
+        "--claims_file", type=str, default="data/phase2/all-data/claims.json"
+    )
+    parser.add_argument("--nproc", type=int, default=4)
+    args = parser.parse_args()
+
+    claims = load_claims(args.claims_file)
     run_claims = list(claims.values())
 
-    pool = multiprocessing.Pool(4)
+    pool = multiprocessing.Pool(args.nproc)
     responses = {}
     for claim, query, res in tqdm(
         pool.imap_unordered(pipeline, run_claims), total=len(run_claims)
     ):
         responses[claim.id] = {"id": claim.id, "res": res, "query": query}
 
-    with open("data/phase2/queries.json", "w") as fo:
+    with open(args.output_file, "w") as fo:
         json.dump(responses, fo, indent=2)
 
-    print("Missed Queries:", sum(1 for v in responses.values() if v is None))
-    print("Scores:", json.dumps(compute_query_score(responses, claims), indent=2))
+    _logger.info("Missed Queries: %d", sum(1 for v in responses.values() if v is None))
+    _logger.info(
+        "Scores: %s", json.dumps(compute_query_score(responses, claims), indent=2)
+    )
