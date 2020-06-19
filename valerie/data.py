@@ -170,6 +170,51 @@ def save_articles(articles, filepath, **kwargs):
         json.dump({k: v.to_dict() for k, v in articles.items()}, fo, **kwargs)
 
 
+def claims_from_phase1(metadata_file):
+    with open(metadata_file) as fi:
+        claims = {
+            d["id"]: Claim(**d)
+            for d in tqdm(json.load(fi), desc="loading claims from phase1")
+        }
+
+    for claim in claims.values():
+        if not claim.related_articles:
+            raise ValueError("claim {} has no related articles".format(claim.id))
+
+        related_articles_dict = {}
+        for rel_art in claim.related_articles:
+            rel_art = str(rel_art) + ".txt"  # use full filename as id
+            related_articles_dict[rel_art] = None
+        claim.related_articles = related_articles_dict
+
+    return claims
+
+
+def _articles_from_phase1_visit(fpath):
+    with open(fpath) as fi:
+        art_id = os.path.basename(fpath)
+        article = Article.from_txt(art_id, fi.read())
+    return art_id, article
+
+
+def articles_from_phase1(articles_dir, nproc=1):
+    # note 1994 articles exists in the phase1 dataset that aren't a related
+    # article for any of the claims, but we keep them as it's extra data we
+    # may use in a corpus or something
+    fpaths = glob.glob(os.path.join(articles_dir, "*.txt"))
+
+    pool = multiprocessing.Pool(nproc)
+    articles = {}
+    for art_id, article in tqdm(
+        pool.imap_unordered(_articles_from_phase1_visit, fpaths),
+        total=len(fpaths),
+        desc="loading articles from phase1",
+    ):
+        articles[art_id] = article
+
+    return articles
+
+
 def claims_from_phase2(metadata_file):
     with open(metadata_file) as fi:
         claims = {
@@ -236,49 +281,21 @@ def articles_from_phase2(articles_dir, claims, nproc=1):
     return articles
 
 
-def claims_from_phase1(metadata_file):
-    with open(metadata_file) as fi:
-        claims = {
-            d["id"]: Claim(**d)
-            for d in tqdm(json.load(fi), desc="loading claims from phase1")
-        }
+def _save_relevant_articles_phase1(metadata, articles_dir, output_dir):
+    # find set of relevant articles in trimmed down dataset
+    relevant_articles = set()
+    for d in metadata:
+        relevant_articles.update(d["related_articles"])
 
-    for claim in claims.values():
-        if not claim.related_articles:
-            raise ValueError("claim {} has no related articles".format(claim.id))
+    # copy relevant articles to output directory
+    for fpath in tqdm(glob.glob(os.path.join(articles_dir, "*.txt"))):
+        article_id = os.path.basename(fpath).split(".")[0]
+        if int(article_id) in relevant_articles:
+            shutil.copyfile(
+                fpath, os.path.join(output_dir, "articles", os.path.basename(fpath))
+            )
 
-        related_articles_dict = {}
-        for rel_art in claim.related_articles:
-            rel_art = str(rel_art) + ".txt"  # use full filename as id
-            related_articles_dict[rel_art] = None
-        claim.related_articles = related_articles_dict
-
-    return claims
-
-
-def _articles_from_phase1_visit(fpath):
-    with open(fpath) as fi:
-        art_id = os.path.basename(fpath)
-        article = Article.from_txt(art_id, fi.read())
-    return art_id, article
-
-
-def articles_from_phase1(articles_dir, nproc=1):
-    # note 1994 articles exists in the phase1 dataset that aren't a related
-    # article for any of the claims, but we keep them as it's extra data we
-    # may use in a corpus or something
-    fpaths = glob.glob(os.path.join(articles_dir, "*.txt"))
-
-    pool = multiprocessing.Pool(nproc)
-    articles = {}
-    for art_id, article in tqdm(
-        pool.imap_unordered(_articles_from_phase1_visit, fpaths),
-        total=len(fpaths),
-        desc="loading articles from phase1",
-    ):
-        articles[art_id] = article
-
-    return articles
+    return len(relevant_articles)
 
 
 def _save_relevant_articles_phase2(metadata, articles_dir, output_dir):
@@ -298,6 +315,46 @@ def _save_relevant_articles_phase2(metadata, articles_dir, output_dir):
             )
 
     return len(relevant_articles)
+
+
+def trim_metadata_phase1(claims_file, articles_dir, output_dir, n_examples):
+    os.makedirs(os.path.join(output_dir, "articles"))
+
+    # load data
+    with open(claims_file, "r") as fi:
+        raw_data = json.load(fi)
+
+    # trim down dataset
+    _logger.info("orig len: %d", len(raw_data))
+    metadata = raw_data[:n_examples]
+    _logger.info("new len: %d", len(metadata))
+
+    num_articles = _save_relevant_articles_phase1(metadata, articles_dir, output_dir)
+    _logger.info("len relevant articles set: %d", num_articles)
+
+    # save trimmed down metadata.json to output directory
+    with open(os.path.join(output_dir, "metadata.json"), "w") as fo:
+        json.dump(metadata, fo, indent=2)
+
+
+def trim_metadata_phase2(claims_file, articles_dir, output_dir, n_examples=None):
+    os.makedirs(os.path.join(output_dir, "articles"))
+
+    # load data
+    with open(claims_file, "r") as fi:
+        raw_data = json.load(fi)
+
+    # trim down dataset
+    _logger.info("orig len: %d", len(raw_data))
+    metadata = raw_data[:n_examples]
+    _logger.info("new len: %d", len(metadata))
+
+    num_articles = _save_relevant_articles_phase2(metadata, articles_dir, output_dir)
+    _logger.info("len relevant articles set: %d", num_articles)
+
+    # save trimmed down metadata.json to output directory
+    with open(os.path.join(output_dir, "metadata.json"), "w") as fo:
+        json.dump(metadata, fo, indent=2)
 
 
 def train_test_split_phase2(
@@ -364,26 +421,3 @@ def train_test_split_phase2(
         json.dump(training_data, fo, indent=2)
     with open(os.path.join(test_dir, "metadata.json"), "w") as fo:
         json.dump(testing_data, fo, indent=2)
-
-
-def trim_metadata_phase2(claims_file, articles_dir, output_dir, n_examples=None):
-    # if output_dir already exists, raise error, else make necessary dirs
-    if os.path.exists(output_dir):
-        raise ValueError("output_dir ({}) already exists".format(output_dir))
-    os.makedirs(os.path.join(output_dir, "articles"))
-
-    # load data
-    with open(claims_file, "r") as fi:
-        raw_data = json.load(fi)
-
-    # trim down dataset
-    _logger.info("orig len: %d", len(raw_data))
-    metadata = raw_data[:n_examples]
-    _logger.info("new len: %d", len(metadata))
-
-    num_articles = _save_relevant_articles_phase2(metadata, articles_dir, output_dir)
-    _logger.info("len relevant articles set: %d", num_articles)
-
-    # save trimmed down metadata.json to output directory
-    with open(os.path.join(output_dir, "metadata.json"), "w") as fo:
-        json.dump(metadata, fo, indent=2)
