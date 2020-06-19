@@ -155,12 +155,9 @@ if __name__ == "__main__":
         time.sleep(1)  # sleep so logging isn't interupted
 
         responses = {}
-        queries = []  ###### DELLLLLL ME
         for claim in tqdm(run_claims):
             claim, query, res = query_func(claim, **run_config)
-            queries.append(query)  ####### DELL MEE
             responses[claim.id] = {"id": claim.id, "query": query, "res": res}
-        _logger.info(json.dumps(queries, indent=2))  ###### DELLLLLLL ME
 
         scores = compute_query_score(responses, claims)
         _logger.info("scores: %s", json.dumps(scores, indent=2))
