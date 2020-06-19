@@ -57,20 +57,26 @@ def compute_query_score(responses, claims):
 
 
 def generate_query(claim):
-    claim_doc = nlp(claim.claim, disable=["textcat", "tagger", "parser"])
+    claim_doc = nlp(claim.claim, disable=["textcat", "tagger", "parser", "ner"])
 
     # stopword removal
     query_words = [token.text for token in claim_doc if not token.is_stop]
+    query = clean_text(
+        " ".join(
+            [
+                t
+                for t in query_words
+                if t and not len(clean_text(t, remove_punctuation=True)) == 0
+            ]
+        )
+    )
 
-    # add claimant to query
+    if claim.date:
+        query += " " + claim.date.split(" ")[0]
+
     if claim.claimant:
-        query_words.insert(0, claim.claimant)
+        query += " " + claim.claimant
 
-    # pad query with named entities
-    if len(query_words) < 8:
-        query_words += [ent.text for ent in claim_doc.ents]
-
-    query = clean_text(" ".join(query_words), remove_punctuation=True)
     return query
 
 
