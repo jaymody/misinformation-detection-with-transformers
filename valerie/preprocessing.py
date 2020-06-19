@@ -61,6 +61,8 @@ def clean_text(text, remove_punctuation=False):
         if remove_punctuation and _is_punctuation(char):
             continue
         if _is_whitespace(char):
+            if len(output) > 0 and output[-1] == " ":
+                continue
             output.append(" ")
         else:
             output.append(char)
