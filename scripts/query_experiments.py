@@ -65,7 +65,7 @@ def run_config_combinations(query_params):
     return run_configs
 
 
-def query_claim(
+def query_func(
     claim, do_date, do_ner, do_claimant, do_stopword, add_beginning, from_idx=0
 ):
     # get spacy nlp data for claim
@@ -139,6 +139,8 @@ if __name__ == "__main__":
     os.makedirs(args.output_dir)
     with open(os.path.join(args.output_dir, "args.json"), "w") as fo:
         json.dump(args.__dict__, fo, indent=2)
+    with open(os.path.join(args.output_dir, "query_func.txt"), "w") as fo:
+        fo.write(inspect.getsource(query_func))
 
     _logger = get_logger(os.path.join(args.output_dir, "log.txt"))
     claims = load_claims(args.claims_file)
@@ -155,7 +157,7 @@ if __name__ == "__main__":
         responses = {}
         queries = []  ###### DELLLLLL ME
         for claim in tqdm(run_claims):
-            claim, query, res = query_claim(claim, **run_config)
+            claim, query, res = query_func(claim, **run_config)
             queries.append(query)  ####### DELL MEE
             responses[claim.id] = {"id": claim.id, "query": query, "res": res}
         _logger.info(json.dumps(queries, indent=2))  ###### DELLLLLLL ME
