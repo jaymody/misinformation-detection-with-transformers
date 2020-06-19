@@ -66,7 +66,7 @@ def run_config_combinations(query_params):
 
 
 def query_claim(
-    claim, do_date, do_ner, do_claimant, do_stopword, add_beggining, from_idx=0
+    claim, do_date, do_ner, do_claimant, do_stopword, add_beginning, from_idx=0
 ):
     # get spacy nlp data for claim
     dis = ["textcat", "tagger", "parser"]
@@ -98,14 +98,14 @@ def query_claim(
 
     # date
     if do_date and claim.date:
-        if add_beggining:
+        if add_beginning:
             query = claim.date.split(" ")[0] + " " + query
         else:
             query += " " + claim.date.split(" ")[0]
 
     # claimant
     if do_claimant and claim.claimant:
-        if add_beggining:
+        if add_beginning:
             query = claim.claimant + " " + query
         else:
             query += " " + claim.claimant
@@ -131,7 +131,7 @@ if __name__ == "__main__":
             "do_ner": [False, True],
             "do_claimant": [True],  # it's been proven that adding claimant helps
             "do_stopword": [True],  # it's been proven stopword removal helps
-            "add_beggining": [False, True],
+            "add_beginning": [False, True],
             "from_idx": [0],
         },
     )
