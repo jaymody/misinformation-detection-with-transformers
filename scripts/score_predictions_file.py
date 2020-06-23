@@ -19,7 +19,7 @@ if __name__ == "__main__":
 
     if not validate_predictions_phase2(predictions)[1]:
         raise ValueError("validate_predictions_phase2 failed")
-    report, output, official_output = compute_detailed_score_phase2(predictions, labels)
+    report, output, official_output = compute_detailed_score_phase2(labels, predictions)
 
     with open(args.report_file, "w") as fo:
         fo.write(report)

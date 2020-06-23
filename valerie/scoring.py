@@ -16,7 +16,7 @@ def validate_predictions_phase2(predictions):
         return {}, False
 
 
-def compute_score_phase2(predictions, labels):
+def compute_score_phase2(labels, predictions):
     """
     predictions and labels are a dict
     check for duplicate relevant articles
@@ -69,7 +69,7 @@ def compute_score_phase2(predictions, labels):
     }
 
 
-def compute_detailed_score_phase2(predictions, labels):
+def compute_detailed_score_phase2(labels, predictions):
     from sklearn.metrics import classification_report
 
     perfect_scores = {"0": [], "1": [], "2": []}
@@ -125,7 +125,7 @@ def compute_detailed_score_phase2(predictions, labels):
         else:
             perfect_scores[l] = np.mean(perfect_scores[l])
 
-    _labs, _prds = zip(*[(predictions[k]["label"], labels[k]["label"]) for k in labels])
+    _labs, _prds = zip(*[(labels[k]["label"], predictions[k]["label"]) for k in labels])
     report = classification_report(_labs, _prds)
 
     output = {
@@ -142,7 +142,7 @@ def compute_detailed_score_phase2(predictions, labels):
             "score_2": perfect_scores["2"],
         },
     }
-    official_output = compute_score_phase2(predictions, labels)
+    official_output = compute_score_phase2(labels, predictions)
     assert abs(output["score"] - official_output["score"]) <= 1e-9 * max(
         abs(output["score"]), abs(official_output["score"])
     )

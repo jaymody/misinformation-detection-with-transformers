@@ -46,9 +46,9 @@ def compute_query_score(responses, claims):
         }
 
     validate_predictions_phase2(predictions)
-    score = compute_score_phase2(predictions, labels)
+    score = compute_score_phase2(labels, predictions)
     validate_predictions_phase2(perfect_predictions)
-    perfect_score = compute_score_phase2(perfect_predictions, labels)
+    perfect_score = compute_score_phase2(labels, perfect_predictions)
     return {
         "perfect_score": perfect_score["score"],
         "perfect_error": perfect_score["error"],
