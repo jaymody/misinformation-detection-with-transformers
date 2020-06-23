@@ -4,7 +4,7 @@
 SRC_DIR="."
 ENVRC_FILE="${SRC_DIR}/.envrc"
 
-METADATA_FILE="${SRC_DIR}/data/phase2/16-data/metadata.json"
+METADATA_FILE="${SRC_DIR}/data/phase2/4-data/metadata.json"
 METADATA_NULL_FILE="${SRC_DIR}/data/phase2/4-data/metadata-null.json"
 METADATA_DEFAULT_FILE="${SRC_DIR}/data/phase2/4-data/metadata-default.json"
 METADATA_MISSING_FILE="${SRC_DIR}/data/phase2/4-data/metadata-missing.json"
@@ -59,9 +59,9 @@ run_test "api" $METADATA_NULL_FILE $METADATA_LABELLED_FILE
 source $ENVRC_FILE
 
 run_test "missing" $METADATA_MISSING_FILE $METADATA_LABELLED_FILE
-run_test "null" $METADATA_NULL_FILE $METADATA_LABELLED_FILE
-run_test "default" $METADATA_DEFAULT_FILE $METADATA_LABELLED_FILE
-run_test "test" $METADATA_FILE $METADATA_FILE
+# run_test "null" $METADATA_NULL_FILE $METADATA_LABELLED_FILE
+# run_test "default" $METADATA_DEFAULT_FILE $METADATA_LABELLED_FILE
+# run_test "test" $METADATA_FILE $METADATA_FILE
 
 
 # cleanup tensorboard throwaway log dir (see modeling.py)
