@@ -25,6 +25,7 @@ from transformers import (
 )
 from torch.utils.data.dataset import Dataset
 from sklearn.metrics import classification_report
+from sklearn.model_selection import StratifiedKFold
 
 _logger = logging.getLogger(__name__)
 
@@ -276,6 +277,95 @@ class SequenceClassificationModel:
                 SequenceClassificationExample(**example) for example in json.load(fi)
             ]
         return examples
+
+    @classmethod
+    def train_kfold_from_pretrained(
+        cls,
+        output_dir,
+        pretrained_model_name_or_path,
+        examples,
+        data_args={},
+        training_args={},
+        config_args={},
+        tokenizer_args={},
+        model_args={},
+        compute_metrics=None,
+        nproc=1,
+    ):
+        if "StratifiedKFold" not in data_args:
+            raise ValueError(
+                "key StratifiedKFold must be in data_args and contain all"
+                "kwargs for sklearn.model_selection.StratifiedKFold."
+            )
+
+        # create output dir and save arg dicts
+        os.makedirs(output_dir)
+        args_dict = {
+            "data_args.json": data_args,
+            "training_args.json": training_args,
+            "config_args.json": config_args,
+            "tokenizer_args.json": tokenizer_args,
+            "model_args.json": model_args,
+        }
+        for k, v in args_dict.items():
+            with open(os.path.join(output_dir, k), "w") as fo:
+                json.dump(v, fo, indent=2)
+
+        # kfold
+        labels = [example.label for example in examples]
+        skf = StratifiedKFold(
+            data_args["n_splits"],
+            shuffle=data_args["shuffle"],
+            random_state=data_args["random_state"],
+        )
+        predictions = {}
+        for k, (train_index, test_index) in enumerate(
+            skf.split(examples, labels), total=data_args["n_splits"]
+        ):
+            # create fold dir and save arg dicts
+            fold_dir = os.path.join(output_dir, "fold-{}".format(k))
+            os.makedirs(fold_dir)
+            for k, v in args_dict.items():
+                with open(os.path.join(fold_dir, k), "w") as fo:
+                    json.dump(v, fo, indent=2)
+
+            # init model
+            model = cls.from_pretrained(
+                pretrained_model_name_or_path,
+                config_args=config_args,
+                tokenizer_args=tokenizer_args,
+                model_args=model_args,
+            )
+
+            # convert examples to features datasets
+            train_examples = [examples[i] for i in train_index]
+            test_examples = [examples[i] for i in test_index]
+            train_dataset = model.create_dataset(examples=train_examples, nproc=nproc)
+            test_dataset = model.create_dataset(examples=test_examples, nproc=nproc)
+
+            # train
+            training_args = SequenceClassificationTrainingArgs(
+                output_dir=fold_dir, logging_dir=fold_dir, **training_args
+            )
+            _global_step, _tr_loss = model.train(
+                train_dataset=train_dataset,
+                test_dataset=test_dataset,
+                training_args=training_args,
+                model_path=pretrained_model_name_or_path,
+                compute_metrics=compute_metrics,
+            )
+
+            # predict
+            predict_output = model.predict(
+                predict_dataset=test_dataset,
+                predict_batch_size=training_args.eval_batch_size,
+            )
+
+            for example, prob in zip(test_examples, predict_output.predictions):
+                assert example.guid not in predictions
+                predictions[example.guid] = prob
+
+        return predictions
 
     @staticmethod
     def compute_metrics(results):
