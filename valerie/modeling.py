@@ -1,6 +1,7 @@
 """Modeling."""
 import os
 import json
+import shutil
 import logging
 import collections
 import dataclasses
@@ -181,13 +182,16 @@ class SequenceClassificationModel:
         # an output dir, we just set it to a throwaway dir in the currrent
         # directory. In addition, the default logging dir is runs, so to avoid
         # it's creation, we route the logging dir to the throwaway dir
+        _temp_dir = ".valerie_tmp"
         args = SequenceClassificationTrainingArgs(
-            output_dir="_tmp",
-            logging_dir="_tmp",
+            output_dir=_temp_dir,
+            logging_dir=_temp_dir,
             do_predict=True,
             per_gpu_eval_batch_size=predict_batch_size,  # eval batch size is used for predict
         )
         trainer = Trainer(model=self.model, args=args)
+        if os.path.exists(_temp_dir):
+            shutil.rmtree(_temp_dir, ignore_errors=True)
         return trainer.predict(test_dataset=predict_dataset)
 
     @classmethod

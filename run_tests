@@ -62,7 +62,3 @@ run_test "missing" $METADATA_MISSING_FILE $METADATA_LABELLED_FILE
 # run_test "null" $METADATA_NULL_FILE $METADATA_LABELLED_FILE
 # run_test "default" $METADATA_DEFAULT_FILE $METADATA_LABELLED_FILE
 # run_test "test" $METADATA_FILE $METADATA_FILE
-
-
-# cleanup tensorboard throwaway log dir (see modeling.py)
-rm -r _tmp
