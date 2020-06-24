@@ -319,8 +319,10 @@ class SequenceClassificationModel:
             random_state=data_args["StratifiedKFold"]["random_state"],
         )
         predictions = {}
-        for k, (train_index, test_index) in enumerate(
-            skf.split(examples, labels), total=data_args["StratifiedKFold"]["n_splits"]
+        for k, (train_index, test_index) in tqdm(
+            enumerate(skf.split(examples, labels)),
+            total=data_args["StratifiedKFold"]["n_splits"],
+            desc="fold",
         ):
             # create fold dir and save arg dicts
             fold_dir = os.path.join(output_dir, "fold-{}".format(k))
