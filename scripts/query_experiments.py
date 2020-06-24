@@ -157,6 +157,11 @@ if __name__ == "__main__":
         responses = {}
         for claim in tqdm(run_claims):
             claim, query, res = query_func(claim, **run_config)
+
+            # discard response html data since it will overload ram
+            for hit in res["hits"]["hits"]:
+                hit["content"] = ""
+
             responses[claim.id] = {"id": claim.id, "query": query, "res": res}
 
         scores = compute_query_score(responses, claims)
