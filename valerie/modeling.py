@@ -314,13 +314,13 @@ class SequenceClassificationModel:
         # kfold
         labels = [example.label for example in examples]
         skf = StratifiedKFold(
-            data_args["n_splits"],
-            shuffle=data_args["shuffle"],
-            random_state=data_args["random_state"],
+            data_args["StratifiedKFold"]["n_splits"],
+            shuffle=data_args["StratifiedKFold"]["shuffle"],
+            random_state=data_args["StratifiedKFold"]["random_state"],
         )
         predictions = {}
         for k, (train_index, test_index) in enumerate(
-            skf.split(examples, labels), total=data_args["n_splits"]
+            skf.split(examples, labels), total=data_args["StratifiedKFold"]["n_splits"]
         ):
             # create fold dir and save arg dicts
             fold_dir = os.path.join(output_dir, "fold-{}".format(k))
