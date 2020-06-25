@@ -346,13 +346,12 @@ class SequenceClassificationModel:
             test_dataset = model.create_dataset(examples=test_examples, nproc=nproc)
 
             # train
-            training_args = SequenceClassificationTrainingArgs(
-                output_dir=fold_dir, logging_dir=fold_dir, **training_args
-            )
             _global_step, _tr_loss = model.train(
                 train_dataset=train_dataset,
                 test_dataset=test_dataset,
-                training_args=training_args,
+                training_args=SequenceClassificationTrainingArgs(
+                    output_dir=fold_dir, logging_dir=fold_dir, **training_args
+                ),
                 model_path=pretrained_model_name_or_path,
                 compute_metrics=compute_metrics,
             )
