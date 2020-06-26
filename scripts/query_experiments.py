@@ -7,7 +7,7 @@ import argparse
 import itertools
 
 import spacy
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from valerie import search
 from valerie.data import load_claims

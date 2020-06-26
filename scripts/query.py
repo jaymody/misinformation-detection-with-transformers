@@ -3,7 +3,7 @@ import argparse
 import multiprocessing
 
 import spacy
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from valerie import search
 from valerie.data import Article, load_claims

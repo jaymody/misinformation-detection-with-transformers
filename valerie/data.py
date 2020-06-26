@@ -9,7 +9,7 @@ import multiprocessing
 
 import bs4
 import tldextract
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from .preprocessing import clean_text
 

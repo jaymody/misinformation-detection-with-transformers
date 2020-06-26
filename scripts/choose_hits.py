@@ -2,7 +2,7 @@ import json
 
 import spacy
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from valerie.data import Article
 from valerie.utils import get_logger

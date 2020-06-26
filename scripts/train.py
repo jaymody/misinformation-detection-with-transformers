@@ -4,7 +4,7 @@ import argparse
 import collections
 from dataclasses import dataclass
 
-from tqdm import tqdm
+from tqdm.auto import tqdm
 from sklearn.model_selection import StratifiedShuffleSplit
 
 from valerie.utils import get_logger

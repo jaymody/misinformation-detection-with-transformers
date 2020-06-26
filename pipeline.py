@@ -7,7 +7,7 @@ import multiprocessing
 
 import spacy
 import numpy as np
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from valerie import search
 from valerie.data import claims_from_phase2, Article
