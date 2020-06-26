@@ -188,7 +188,7 @@ class SequenceClassificationModel:
             output_dir=_temp_dir,
             logging_dir=_temp_dir,
             do_predict=True,
-            per_gpu_eval_batch_size=predict_batch_size,  # eval batch size is used for predict
+            per_device_eval_batch_size=predict_batch_size,  # eval batch size is used for predict
         )
         trainer = Trainer(model=self.model, args=args)
         if os.path.exists(_temp_dir):
@@ -359,7 +359,7 @@ class SequenceClassificationModel:
             # predict
             predict_output = model.predict(
                 predict_dataset=test_dataset,
-                predict_batch_size=training_args.eval_batch_size,
+                predict_batch_size=training_args["per_device_eval_batch_size"],
             )
 
             for example, prob in zip(test_examples, predict_output.predictions):
