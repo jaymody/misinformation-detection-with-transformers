@@ -66,7 +66,14 @@ def run_config_combinations(query_params):
 
 
 def query_func(
-    claim, do_date, do_ner, do_claimant, do_stopword, add_beginning, from_idx=0
+    claim,
+    do_date,
+    do_ner,
+    do_claimant,
+    do_stopword,
+    do_lemma,
+    add_beginning,
+    from_idx=0,
 ):
     # get spacy nlp data for claim
     dis = ["textcat", "tagger", "parser"]
@@ -75,9 +82,17 @@ def query_func(
     claim_doc = nlp(claim.claim, disable=dis)
 
     # stopword removal
-    query_words = [
-        token.text for token in claim_doc if not do_stopword or not token.is_stop
+    query_tokens = [
+        token for token in claim_doc if not do_stopword or not token.is_stop
     ]
+
+    # lemmatization
+    if do_lemma:
+        query_words = [token.lemma_ for token in query_tokens]
+    else:
+        query_words = [token.text for token in query_tokens]
+
+    # clean text
     query = clean_text(
         " ".join(
             [
@@ -118,24 +133,24 @@ def query_func(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", type=str)
-    parser.add_argument(
-        "--claims_file", type=str, default="data/phase2/all-data/claims.json"
-    )
+    parser.add_argument("--claims_file", type=str)
     parser.add_argument("--seed", type=int, default=123)
-    parser.add_argument("--n_samples", type=int, default=1000)
+    parser.add_argument("--n_samples", type=int, default=None)
     parser.add_argument(
         "--query_params",
         type=dict,
         default={
-            "do_date": [False, True],
-            "do_ner": [False, True],
+            "do_date": [True],  # it's been proven that adding date helps
+            "do_ner": [False],  # adding ner doesn't seem to make a difference
             "do_claimant": [True],  # it's been proven that adding claimant helps
             "do_stopword": [True],  # it's been proven stopword removal helps
-            "add_beginning": [False, True],
+            "do_lemma": [False, True],
+            "add_beginning": [False],  # doesn't make a difference
             "from_idx": [0],
         },
     )
     args = parser.parse_args()
+
     os.makedirs(args.output_dir)
     with open(os.path.join(args.output_dir, "args.json"), "w") as fo:
         json.dump(args.__dict__, fo, indent=2)
@@ -145,7 +160,8 @@ if __name__ == "__main__":
     _logger = get_logger(os.path.join(args.output_dir, "log.txt"))
     claims = load_claims(args.claims_file)
     random.seed(args.seed)
-    run_claims = random.sample(list(claims.values()), args.n_samples)
+    n_samples = args.n_samples if args.n_samples is not None else len(claims)
+    run_claims = random.sample(list(claims.values()), n_samples)
     run_configs = run_config_combinations(args.query_params)
 
     output = {}
@@ -159,8 +175,9 @@ if __name__ == "__main__":
             claim, query, res = query_func(claim, **run_config)
 
             # discard response html data since it will overload ram
-            for hit in res["hits"]["hits"]:
-                hit["content"] = ""
+            if res:
+                for hit in res["hits"]["hits"]:
+                    hit["content"] = ""
 
             responses[claim.id] = {"id": claim.id, "query": query, "res": res}
 
