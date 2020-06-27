@@ -378,10 +378,29 @@ class SequenceClassificationModel:
 
         metrics = {}
         metrics["accuracy"] = report.pop("accuracy")
-        metrics["f1_macro"] = report.pop("macro avg")["f1-score"]
-        metrics["f1_weighted"] = report.pop("weighted avg")["f1-score"]
+
+        macro_avg = report.pop("macro avg")
+        metrics["f1_macro"], metrics["recall_macro"], metrics["precision_macro"] = (
+            macro_avg["f1-score"],
+            macro_avg["recall"],
+            macro_avg["precision"],
+        )
+
+        weighted_avg = report.pop("weighted avg")
+        (
+            metrics["f1_weighted"],
+            metrics["recall_weighted"],
+            metrics["precision_weighted"],
+        ) = (
+            weighted_avg["f1-score"],
+            weighted_avg["recall"],
+            weighted_avg["precision"],
+        )
+
         for k, v in report.items():
-            metrics["f1_label_{}".format(k)] = v["f1-score"]
+            metrics["f1_{}".format(k)] = v["f1-score"]
+            metrics["recall_{}".format(k)] = v["recall"]
+            metrics["precision_{}".format(k)] = v["precision"]
 
         return metrics
 
