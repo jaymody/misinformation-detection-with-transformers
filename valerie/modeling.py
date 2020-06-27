@@ -108,6 +108,7 @@ class SequenceClassificationDataset(Dataset):
             example.text_a,
             example.text_b,
             max_length=self.max_length,
+            truncation=True,
             pad_to_max_length=True,
         )
         label = self.label_from_example(example)
