@@ -8,7 +8,7 @@ from tqdm.auto import tqdm
 from valerie import search
 from valerie.data import Article, load_claims
 from valerie.utils import get_logger
-from valerie.scoring import validate_predictions_phase2, compute_score_phase2
+from valerie.scoring import validate_predictions_phase2, _compute_score_phase2
 from valerie.preprocessing import clean_text
 
 _logger = get_logger()
@@ -46,9 +46,9 @@ def compute_query_score(responses, claims):
         }
 
     validate_predictions_phase2(predictions)
-    score = compute_score_phase2(labels, predictions)
+    score = _compute_score_phase2(labels, predictions)
     validate_predictions_phase2(perfect_predictions)
-    perfect_score = compute_score_phase2(labels, perfect_predictions)
+    perfect_score = _compute_score_phase2(labels, perfect_predictions)
     return {
         "perfect_score": perfect_score["score"],
         "perfect_error": perfect_score["error"],

@@ -348,27 +348,29 @@ if __name__ == "__main__":
 
     _logger.info("... compiling output ...")
     output = {}
-    for k, claim in claims.items():
+    for claim_id, claim in claims.items():
         # label (predicted)
-        pred = seq_clf_predictions[k]
+        pred = seq_clf_predictions[claim_id]
         assert isinstance(pred, int)
         assert pred in label_set
 
         # related articles
         related_articles = list(claim.related_articles.keys())
         related_articles = related_articles[:2]
-        assert isinstance(related_articles, list)
+        related_articles = {i + 1: x for i, x in enumerate(related_articles)}
+        assert isinstance(related_articles, dict)
         assert len(related_articles) >= 0 and len(related_articles) <= 2
-        for rel_art in related_articles:
-            assert isinstance(rel_art, str)
+        for k, v in related_articles.items():
+            assert k in {1, 2}
+            assert isinstance(v, str)
 
         # explanation
         explanation = []
 
         first_source = None
         try:
-            for sup in support[k]:
-                for i, rel_art in enumerate(related_articles):
+            for sup in support[claim_id]:
+                for i, rel_art in related_articles.items():
                     if (
                         len(explanation) >= 2
                         or sup["art_id"] != rel_art
@@ -385,7 +387,7 @@ if __name__ == "__main__":
                         explanation.append(
                             "The claim is {}, as explained in the {} "
                             'article, which states "{}".'.format(
-                                id2label[pred], number2place[i + 1], sup_text,
+                                id2label[pred], number2place[i], sup_text,
                             )
                         )
                         first_source = art.source
@@ -399,7 +401,7 @@ if __name__ == "__main__":
                         explanation.append(
                             "This conclusion is also confirmed by the {} article{}, "
                             '"{}".'.format(
-                                number2place[i + 1],
+                                number2place[i],
                                 " from " + art.source if art.source else "",
                                 sup_text[:400],
                             )
@@ -409,10 +411,10 @@ if __name__ == "__main__":
 
         # backup default explanation
         if not explanation:
-            explanation.append(seq_clf_explanations[k])
+            explanation.append(seq_clf_explanations[claim_id])
 
-        if claimant_predictions[k] == pred:
-            explanation.append(claimant_explanations[k])
+        if claimant_predictions[claim_id] == pred:
+            explanation.append(claimant_explanations[claim_id])
 
         explanation = [e for e in explanation if e]
         explanation = " ".join(explanation)
@@ -423,7 +425,7 @@ if __name__ == "__main__":
         assert len(explanation) < 1000
 
         # final predictions
-        output[k] = {
+        output[claim_id] = {
             "label": pred,
             "related_articles": related_articles,
             "explanation": explanation,

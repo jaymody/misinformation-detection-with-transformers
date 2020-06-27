@@ -1,5 +1,7 @@
 """Official and modified scoring functions."""
 import json
+import copy
+
 import numpy as np
 
 
@@ -17,6 +19,14 @@ def validate_predictions_phase2(predictions):
 
 
 def compute_score_phase2(labels, predictions):
+    """Adapted for new submission format."""
+    _predictions = copy.deepcopy(predictions)
+    for pred in _predictions.values():
+        pred["related_articles"] = list(pred["related_articles"].values())
+    return _compute_score_phase2(labels, _predictions)
+
+
+def _compute_score_phase2(labels, predictions):
     """
     predictions and labels are a dict
     check for duplicate relevant articles
@@ -70,6 +80,14 @@ def compute_score_phase2(labels, predictions):
 
 
 def compute_detailed_score_phase2(labels, predictions):
+    """Adapted for new submission format."""
+    _predictions = copy.deepcopy(predictions)
+    for pred in _predictions.values():
+        pred["related_articles"] = list(pred["related_articles"].values())
+    return _compute_detailed_score_phase2(labels, _predictions)
+
+
+def _compute_detailed_score_phase2(labels, predictions):
     from sklearn.metrics import classification_report
 
     perfect_scores = {"0": [], "1": [], "2": []}
@@ -142,7 +160,7 @@ def compute_detailed_score_phase2(labels, predictions):
             "score_2": perfect_scores["2"],
         },
     }
-    official_output = compute_score_phase2(labels, predictions)
+    official_output = _compute_score_phase2(labels, predictions)
     assert abs(output["score"] - official_output["score"]) <= 1e-9 * max(
         abs(output["score"]), abs(official_output["score"])
     )
