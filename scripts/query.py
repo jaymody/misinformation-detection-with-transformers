@@ -106,7 +106,8 @@ def convert_html_hits_to_article(res):
 def pipeline(claim):
     query = generate_query(claim)
     res = search.query(query)
-    res["hits"]["hits"] = convert_html_hits_to_article(res)
+    if res:
+        res["hits"]["hits"] = convert_html_hits_to_article(res)
     return claim, query, res
 
 
