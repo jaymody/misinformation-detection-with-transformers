@@ -8,7 +8,6 @@ METADATA_FILE="${SRC_DIR}/data/phase2/4-data/metadata.json"
 METADATA_NULL_FILE="${SRC_DIR}/data/phase2/4-data/metadata-null.json"
 METADATA_DEFAULT_FILE="${SRC_DIR}/data/phase2/4-data/metadata-default.json"
 METADATA_MISSING_FILE="${SRC_DIR}/data/phase2/4-data/metadata-missing.json"
-METADATA_LABELLED_FILE="${SRC_DIR}/data/phase2/4-data/metadata.json"
 
 CLAIMANT_MODEL_FILE="${SRC_DIR}/models/claimant_model.json"
 PRETRAINED_MODEL_NAME_OR_PATH="${SRC_DIR}/models/phase2/single-claim-claimant/bert-base-cased-128-0"
@@ -54,11 +53,11 @@ run_test() {
 # tests
 source $ENVRC_FILE
 export LEADERS_PRIZE_API_KEY="not-a-real-value"
-run_test "api" $METADATA_NULL_FILE $METADATA_LABELLED_FILE
+run_test "api" $METADATA_MISSING_FILE $METADATA_FILE
 
 source $ENVRC_FILE
 
-run_test "missing" $METADATA_MISSING_FILE $METADATA_LABELLED_FILE
-# run_test "null" $METADATA_NULL_FILE $METADATA_LABELLED_FILE
-# run_test "default" $METADATA_DEFAULT_FILE $METADATA_LABELLED_FILE
+run_test "missing" $METADATA_MISSING_FILE $METADATA_FILE
+# run_test "null" $METADATA_NULL_FILE $METADATA_FILE
+# run_test "default" $METADATA_DEFAULT_FILE $METADATA_FILE
 # run_test "test" $METADATA_FILE $METADATA_FILE
