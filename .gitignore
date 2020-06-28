@@ -1,4 +1,4 @@
-# dirs/files
+### Project ###
 archive/
 logs/
 submissions/
@@ -8,11 +8,12 @@ info/
 models/
 run_compile
 run_vm
-run_linting
 todo.md
-_tmp/
 _*.ipynb
 .envrc
+
+
+### Python ###
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -36,7 +37,6 @@ parts/
 sdist/
 var/
 wheels/
-pip-wheel-metadata/
 share/python-wheels/
 *.egg-info/
 .installed.cfg
@@ -89,6 +89,7 @@ instance/
 docs/_build/
 
 # PyBuilder
+.pybuilder/
 target/
 
 # Jupyter Notebook
@@ -149,3 +150,7 @@ dmypy.json
 
 # pytype static type analyzer
 .pytype/
+
+# Cython debug symbols
+cython_debug/
+
