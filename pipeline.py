@@ -34,9 +34,98 @@ furthermore_syns = [
     "Moreover",
 ]
 
-
 _logger.info("... loading spacy ...")
 nlp = spacy.load("en_core_web_lg")
+
+
+########## Compile Final Output ##########
+
+
+def compile_final_output(claims, seq_clf_predictions, claimant_predictions, support):
+    output = {}
+    for claim_id, claim in claims.items():
+        # label (predicted)
+        pred = seq_clf_predictions[claim_id]
+        assert isinstance(pred, int)
+        assert pred in label_set
+
+        # related articles
+        related_articles = list(claim.related_articles.keys())
+        related_articles = related_articles[:2]
+        related_articles = {i + 1: x for i, x in enumerate(related_articles)}
+        assert isinstance(related_articles, dict)
+        assert len(related_articles) >= 0 and len(related_articles) <= 2
+        for k, v in related_articles.items():
+            assert k in {1, 2}
+            assert isinstance(v, str)
+
+        # explanation
+        explanation = []
+
+        first_source = None
+        try:
+            for sup in support[claim_id]:
+                for i, rel_art in related_articles.items():
+                    if (
+                        len(explanation) >= 2
+                        or sup["art_id"] != rel_art
+                        or sup["similarity"] < 0.80
+                    ):
+                        continue
+
+                    sup_text = sup["text"]
+                    if len(sup_text) > 340:
+                        sup_text = sup_text[:335] + " ..."
+
+                    art = articles[rel_art]
+                    if len(explanation) == 0:
+                        explanation.append(
+                            "The claim is {}, as explained in the {} "
+                            'article, which states "{}".'.format(
+                                id2label[pred], number2place[i], sup_text,
+                            )
+                        )
+                        first_source = art.source
+                    elif art.source == first_source and first_source is not None:
+                        explanation.append(
+                            '{}, the article goes on to say "{}".'.format(
+                                random.choice(furthermore_syns), sup_text,
+                            )
+                        )
+                    else:
+                        explanation.append(
+                            "This conclusion is also confirmed by the {} article{}, "
+                            '"{}".'.format(
+                                number2place[i],
+                                " from " + art.source if art.source else "",
+                                sup_text[:400],
+                            )
+                        )
+        except:
+            explanation = []
+
+        # backup default explanation
+        if not explanation:
+            explanation.append(seq_clf_explanations[claim_id])
+
+        if claimant_predictions[claim_id] == pred:
+            explanation.append(claimant_explanations[claim_id])
+
+        explanation = [e for e in explanation if e]
+        explanation = " ".join(explanation)
+        if len(explanation) > 995:
+            explanation = explanation[:995] + " ..."
+        explanation = explanation[:999]
+        assert isinstance(explanation, str)
+        assert len(explanation) < 1000
+
+        # final predictions
+        output[claim_id] = {
+            "label": pred,
+            "related_articles": related_articles,
+            "explanation": explanation,
+        }
+    return output
 
 
 ########## Claimant Classification ##########
@@ -105,9 +194,27 @@ def _sequence_classification(
     return probabilities
 
 
+def generate_sequence_classification_examples(claims):
+    examples = []
+    for k, claim in tqdm(claims.items(), desc="generating examples"):
+        examples.append(
+            SequenceClassificationExample(
+                guid=k,
+                text_a=claim.claim,
+                text_b=(claim.claimant if claim.claimant else "no claimant")
+                + " "
+                + (claim.date.split()[0] if claim.date else "no date"),
+                label=claim.label,
+            )
+        )
+    return examples
+
+
 def sequence_classification(
     examples, pretrained_model_name_or_path, predict_batch_size, nproc
 ):
+    examples = generate_sequence_classification_examples(claims)
+
     probabilities = _sequence_classification(
         examples,
         pretrained_model_name_or_path,
@@ -193,22 +300,6 @@ def generate_support(claims, nproc):
     ):
         all_support[claim.id] = support
     return all_support
-
-
-def generate_examples(claims):
-    examples = []
-    for k, claim in tqdm(claims.items(), desc="generating examples"):
-        examples.append(
-            SequenceClassificationExample(
-                guid=k,
-                text_a=claim.claim,
-                text_b=(claim.claimant if claim.claimant else "no claimant")
-                + " "
-                + (claim.date.split()[0] if claim.date else "no date"),
-                label=claim.label,
-            )
-        )
-    return examples
 
 
 ########## Related Articles ##########
@@ -313,6 +404,9 @@ def get_responses(claims, nproc):
     return responses
 
 
+########## Main ##########
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser("Main pipeline for the phase2 submission.")
     parser.add_argument("--metadata_file", type=str)
@@ -323,126 +417,49 @@ if __name__ == "__main__":
     parser.add_argument("--nproc", type=int, default=1)
     args = parser.parse_args()
 
+    # read metadata and convert to claims objects
     _logger.info("... reading claims from {} ...".format(args.metadata_file))
     claims = claims_from_phase2(args.metadata_file)
 
+    # fetch search api responses
     _logger.info("... fetching query responses ...")
     responses = get_responses(claims, args.nproc)
 
+    # select related articles
     _logger.info("... selecting related articles ...")
     articles = select_related_articles(claims, responses)
 
+    # generate supporting article evidence for each claim
     _logger.info("... generating support ...")
     try:
         support = generate_support(claims, nproc=args.nproc)
     except:
         support = {}
 
-    _logger.info("... generating examples ...")
-    examples = generate_examples(claims)
-
+    # get sequence classification predictions and explanations
     _logger.info("... generating sequence classification predictions ...")
     seq_clf_predictions, seq_clf_explanations = sequence_classification(
-        examples,
-        args.pretrained_model_name_or_path,
-        args.predict_batch_size,
-        args.nproc,
+        claims, args.pretrained_model_name_or_path, args.predict_batch_size, args.nproc,
     )
 
+    # get claimant classification predictions and explanations
     _logger.info("... generating claimant predictions ...")
     claimant_predictions, claimant_explanations = claimant_classification(
         claims, args.claimant_model_file
     )
 
+    # compile final output
     _logger.info("... compiling output ...")
-    output = {}
-    for claim_id, claim in claims.items():
-        # label (predicted)
-        pred = seq_clf_predictions[claim_id]
-        assert isinstance(pred, int)
-        assert pred in label_set
+    output = compile_final_output(
+        claims, seq_clf_predictions, claimant_predictions, support
+    )
 
-        # related articles
-        related_articles = list(claim.related_articles.keys())
-        related_articles = related_articles[:2]
-        related_articles = {i + 1: x for i, x in enumerate(related_articles)}
-        assert isinstance(related_articles, dict)
-        assert len(related_articles) >= 0 and len(related_articles) <= 2
-        for k, v in related_articles.items():
-            assert k in {1, 2}
-            assert isinstance(v, str)
-
-        # explanation
-        explanation = []
-
-        first_source = None
-        try:
-            for sup in support[claim_id]:
-                for i, rel_art in related_articles.items():
-                    if (
-                        len(explanation) >= 2
-                        or sup["art_id"] != rel_art
-                        or sup["similarity"] < 0.80
-                    ):
-                        continue
-
-                    sup_text = sup["text"]
-                    if len(sup_text) > 340:
-                        sup_text = sup_text[:335] + " ..."
-
-                    art = articles[rel_art]
-                    if len(explanation) == 0:
-                        explanation.append(
-                            "The claim is {}, as explained in the {} "
-                            'article, which states "{}".'.format(
-                                id2label[pred], number2place[i], sup_text,
-                            )
-                        )
-                        first_source = art.source
-                    elif art.source == first_source and first_source is not None:
-                        explanation.append(
-                            '{}, the article goes on to say "{}".'.format(
-                                random.choice(furthermore_syns), sup_text,
-                            )
-                        )
-                    else:
-                        explanation.append(
-                            "This conclusion is also confirmed by the {} article{}, "
-                            '"{}".'.format(
-                                number2place[i],
-                                " from " + art.source if art.source else "",
-                                sup_text[:400],
-                            )
-                        )
-        except:
-            explanation = []
-
-        # backup default explanation
-        if not explanation:
-            explanation.append(seq_clf_explanations[claim_id])
-
-        if claimant_predictions[claim_id] == pred:
-            explanation.append(claimant_explanations[claim_id])
-
-        explanation = [e for e in explanation if e]
-        explanation = " ".join(explanation)
-        if len(explanation) > 995:
-            explanation = explanation[:995] + " ..."
-        explanation = explanation[:999]
-        assert isinstance(explanation, str)
-        assert len(explanation) < 1000
-
-        # final predictions
-        output[claim_id] = {
-            "label": pred,
-            "related_articles": related_articles,
-            "explanation": explanation,
-        }
-
+    # write output to json
     _logger.info("... writing predictions to {} ...".format(args.predictions_file))
     with open(args.predictions_file, "w") as fo:
         json.dump(output, fo, indent=2)
-
     if not os.path.exists(args.predictions_file):
         raise ValueError("predictions file was not created")
+
+    # done :)
     _logger.info("... done ...")
