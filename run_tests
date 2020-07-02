@@ -1,43 +1,37 @@
 #!/bin/bash
 
 # params
-SRC_DIR="."
-ENVRC_FILE="${SRC_DIR}/.envrc"
+ENVRC_FILE=".envrc"
+METADATA_FILE="data/phase2-1/raw/metadata.json"
+CLAIMANT_MODEL_FILE="models/claimant_model.json"
+PRETRAINED_MODEL_NAME_OR_PATH="models/phase2/single-claim-claimant/bert-base-cased-128-0"
 
-METADATA_FILE="${SRC_DIR}/data/phase2/4-data/metadata.json"
-METADATA_NULL_FILE="${SRC_DIR}/data/phase2/4-data/metadata-null.json"
-METADATA_DEFAULT_FILE="${SRC_DIR}/data/phase2/4-data/metadata-default.json"
-METADATA_MISSING_FILE="${SRC_DIR}/data/phase2/4-data/metadata-missing.json"
-
-CLAIMANT_MODEL_FILE="${SRC_DIR}/models/claimant_model.json"
-PRETRAINED_MODEL_NAME_OR_PATH="${SRC_DIR}/models/phase2/single-claim-claimant/bert-base-cased-128-0"
-
-TEST_OUTPUT_DIR="${SRC_DIR}/logs/tests"
+TEST_OUTPUT_DIR="logs/tests"
 mkdir -p ${TEST_OUTPUT_DIR}
 
 
 # test func
 run_test() {
     # arg1 name of test (used for output)
-    # arg2 path to metadata file to predict
-    # arg3 path to metadata file with labels
     echo -e "\n\n\n\n\n"
     echo "-------- ${1} --------"
     echo ""
+    local METADATA_FILE_LABELLED="${TEST_OUTPUT_DIR}/metadata-labelled.json"
+    local METADATA_FILE_UNLABELLED="${TEST_OUTPUT_DIR}/metadata-unlabelled.json"
     local PREDICTIONS_FILE="${TEST_OUTPUT_DIR}/${1}-predictions.json"
     local SCORE_FILE="${TEST_OUTPUT_DIR}/${1}-score.json"
     local REPORT_FILE="${TEST_OUTPUT_DIR}/${1}-report.txt"
 
-    python ${SRC_DIR}/pipeline.py \
-        --metadata_file ${2} \
+    python pipeline.py \
+        --metadata_file ${METADATA_FILE_UNLABELLED} \
         --predictions_file ${PREDICTIONS_FILE} \
         --claimant_model_file ${CLAIMANT_MODEL_FILE} \
         --pretrained_model_name_or_path ${PRETRAINED_MODEL_NAME_OR_PATH} \
         --predict_batch_size 1 \
         --nproc 4
 
-    python ${SRC_DIR}/scripts/score_predictions_file.py \
-        --metadata_file ${3} \
+    python scripts/score_predictions_file.py \
+        --metadata_file ${METADATA_FILE_LABELLED} \
         --predictions_file ${PREDICTIONS_FILE} \
         --score_file ${SCORE_FILE} \
         --report_file ${REPORT_FILE}
@@ -50,14 +44,17 @@ run_test() {
 }
 
 
+# create test data
+python scripts/phase2_to_test_data.py \
+    --metadata_file ${METADATA_FILE} \
+    --output_dir ${TEST_OUTPUT_DIR} \
+    --truncate 4
+
+
 # tests
 source $ENVRC_FILE
 export LEADERS_PRIZE_API_KEY="not-a-real-value"
-run_test "api" $METADATA_MISSING_FILE $METADATA_FILE
+run_test "api"
 
 source $ENVRC_FILE
-
-run_test "missing" $METADATA_MISSING_FILE $METADATA_FILE
-# run_test "null" $METADATA_NULL_FILE $METADATA_FILE
-# run_test "default" $METADATA_DEFAULT_FILE $METADATA_FILE
-# run_test "test" $METADATA_FILE $METADATA_FILE
+run_test "test"
