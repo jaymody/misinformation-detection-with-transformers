@@ -114,9 +114,7 @@ def pipeline(claim):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_file", type=str)
-    parser.add_argument(
-        "--claims_file", type=str, default="data/phase2/all-data/claims.json"
-    )
+    parser.add_argument("--claims_file", type=str)
     parser.add_argument("--nproc", type=int, default=4)
     args = parser.parse_args()
 
