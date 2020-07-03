@@ -9,11 +9,9 @@ import multiprocessing
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
-import numpy as np
-import pandas as pd
-
 import torch
 import numpy as np
+import pandas as pd
 from tqdm.auto import tqdm
 from transformers import (
     AutoConfig,

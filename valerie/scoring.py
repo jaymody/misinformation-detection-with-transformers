@@ -1,6 +1,6 @@
 """Official and modified scoring functions."""
-import json
 import copy
+import json
 
 import numpy as np
 
