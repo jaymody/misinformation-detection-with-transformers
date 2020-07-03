@@ -124,7 +124,9 @@ if __name__ == "__main__":
     pool = multiprocessing.Pool(args.nproc)
     responses = {}
     for claim, query, res in tqdm(
-        pool.imap_unordered(pipeline, run_claims), total=len(run_claims)
+        pool.imap_unordered(pipeline, run_claims),
+        total=len(run_claims),
+        desc="fetching responses",
     ):
         responses[claim.id] = {"id": claim.id, "res": res, "query": query}
 
