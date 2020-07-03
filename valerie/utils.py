@@ -29,13 +29,19 @@ def stats(values, plot=False):
     import seaborn as sns
     import matplotlib.pyplot as plt
 
+    # workaround for multiple modes
+    try:
+        mode = statistics.mode(values)
+    except:
+        mode = None
+
     d = {
         "len": len(values),
         "max": max(values),
         "min": min(values),
         "mean": statistics.mean(values),
         "median": statistics.median(values),
-        "mode": statistics.mode(values),
+        "mode": mode,
         "stdev": statistics.stdev(values),
     }
 
