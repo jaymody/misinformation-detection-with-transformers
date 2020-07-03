@@ -6,7 +6,7 @@ import spacy
 from tqdm.auto import tqdm
 
 from valerie import search
-from valerie.data import Article, load_claims
+from valerie.data import Article, claims_from_phase2
 from valerie.utils import get_logger
 from valerie.scoring import validate_predictions_phase2, _compute_score_phase2
 from valerie.preprocessing import clean_text
@@ -114,11 +114,11 @@ def pipeline(claim):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_file", type=str)
-    parser.add_argument("--claims_file", type=str)
+    parser.add_argument("--metadata_file", type=str)
     parser.add_argument("--nproc", type=int, default=4)
     args = parser.parse_args()
 
-    claims = load_claims(args.claims_file)
+    claims = claims_from_phase2(args.metadata_file)
     run_claims = list(claims.values())
 
     pool = multiprocessing.Pool(args.nproc)

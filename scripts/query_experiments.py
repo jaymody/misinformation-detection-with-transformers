@@ -10,7 +10,7 @@ import spacy
 from tqdm.auto import tqdm
 
 from valerie import search
-from valerie.data import load_claims
+from valerie.data import claims_from_phase2
 from valerie.utils import get_logger
 from valerie.scoring import validate_predictions_phase2, _compute_score_phase2
 from valerie.preprocessing import clean_text
@@ -133,7 +133,7 @@ def query_func(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", type=str)
-    parser.add_argument("--claims_file", type=str)
+    parser.add_argument("--metadata_file", type=str)
     parser.add_argument("--seed", type=int, default=123)
     parser.add_argument("--n_samples", type=int, default=None)
     parser.add_argument(
@@ -158,7 +158,7 @@ if __name__ == "__main__":
         fo.write(inspect.getsource(query_func))
 
     _logger = get_logger(os.path.join(args.output_dir, "log.txt"))
-    claims = load_claims(args.claims_file)
+    claims = claims_from_phase2(args.metadata_file)
     random.seed(args.seed)
     n_samples = args.n_samples if args.n_samples is not None else len(claims)
     run_claims = random.sample(list(claims.values()), n_samples)
