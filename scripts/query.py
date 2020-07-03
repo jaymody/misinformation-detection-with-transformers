@@ -133,7 +133,9 @@ if __name__ == "__main__":
     with open(args.output_file, "w") as fo:
         json.dump(responses, fo, indent=2)
 
-    _logger.info("Missed Queries: %d", sum(1 for v in responses.values() if v is None))
+    _logger.info(
+        "Missed Queries: %d", sum(1 for v in responses.values() if v["res"] is None)
+    )
     _logger.info(
         "Scores: %s", json.dumps(compute_query_score(responses, claims), indent=2)
     )
