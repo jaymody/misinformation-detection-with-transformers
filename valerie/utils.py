@@ -22,3 +22,25 @@ def get_logger(logfile=None):
         logger.handlers.append(fh)
 
     return logger
+
+
+def stats(values, plot=False):
+    import statistics
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+
+    d = {
+        "len": len(values),
+        "max": max(values),
+        "min": min(values),
+        "mean": statistics.mean(values),
+        "median": statistics.median(values),
+        "mode": statistics.mode(values),
+        "stdev": statistics.stdev(values),
+    }
+
+    if plot:
+        sns.distplot(values)
+        plt.show()
+
+    return d
