@@ -26,8 +26,6 @@ def get_logger(logfile=None):
 
 def stats(values, plot=False):
     import statistics
-    import seaborn as sns
-    import matplotlib.pyplot as plt
 
     # workaround for multiple modes
     try:
@@ -46,6 +44,9 @@ def stats(values, plot=False):
     }
 
     if plot:
+        import seaborn as sns
+        import matplotlib.pyplot as plt
+
         sns.distplot(values)
         plt.show()
 
