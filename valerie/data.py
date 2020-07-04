@@ -33,7 +33,7 @@ class Claim:
         """Constructor for Claim."""
         self.id = id
         self.claim = clean_text(claim)[:4000] if claim else None  # restrict num chars
-        self.claimant = claimant
+        self.claimant = clean_text(claimant) if claimant else None
         self.label = label
         self.date = date
         self.related_articles = related_articles
