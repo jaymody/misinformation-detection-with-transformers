@@ -10,7 +10,8 @@ import numpy as np
 from tqdm.auto import tqdm
 
 from valerie import search
-from valerie.data import claims_from_phase2, Article
+from valerie.data import Article
+from valerie.datasets import Phase2Dataset
 from valerie.utils import get_logger
 from valerie.modeling import (
     ClaimantModel,
@@ -43,9 +44,9 @@ nlp = spacy.load("en_core_web_lg")
 
 def compile_final_output(claims, seq_clf_predictions, claimant_predictions, support):
     output = {}
-    for claim_id, claim in claims.items():
+    for claim in claims:
         # label (predicted)
-        pred = seq_clf_predictions[claim_id]
+        pred = seq_clf_predictions[claim.id]
         assert isinstance(pred, int)
         assert pred in label_set
 
@@ -64,7 +65,7 @@ def compile_final_output(claims, seq_clf_predictions, claimant_predictions, supp
 
         first_source = None
         try:
-            for sup in support[claim_id]:
+            for sup in support[claim.id]:
                 for i, rel_art in related_articles.items():
                     if (
                         len(explanation) >= 2
@@ -106,10 +107,10 @@ def compile_final_output(claims, seq_clf_predictions, claimant_predictions, supp
 
         # backup default explanation
         if not explanation:
-            explanation.append(seq_clf_explanations[claim_id])
+            explanation.append(seq_clf_explanations[claim.id])
 
-        if claimant_predictions[claim_id] == pred:
-            explanation.append(claimant_explanations[claim_id])
+        if claimant_predictions[claim.id] == pred:
+            explanation.append(claimant_explanations[claim.id])
 
         explanation = [e for e in explanation if e]
         explanation = " ".join(explanation)
@@ -120,7 +121,7 @@ def compile_final_output(claims, seq_clf_predictions, claimant_predictions, supp
         assert len(explanation) < 1000
 
         # final predictions
-        output[claim_id] = {
+        output[claim.id] = {
             "label": pred,
             "related_articles": related_articles,
             "explanation": explanation,
@@ -136,19 +137,19 @@ def claimant_classification(claims, claimant_model_file):
 
     predictions = {}
     explanations = {}
-    for k, claim in tqdm(claims.items(), desc="ClaimantModel predictions"):
+    for claim in tqdm(claims, desc="ClaimantModel predictions"):
         pred = claimant_model.predict(claim)
         if pred is None:
-            predictions[k] = int(random.randint(0, 2))
-            explanations[k] = ""
+            predictions[claim.id] = int(random.randint(0, 2))
+            explanations[claim.id] = ""
             continue
 
         pred = int(np.argmax(pred))
         assert pred in label_set, pred
-        predictions[k] = pred
+        predictions[claim.id] = pred
 
         if pred == 0:
-            explanations[k] = (
+            explanations[claim.id] = (
                 "This is also supported by the fact that the claimant has a history "
                 "of misinformation, having previously made {} (out of {}) "
                 "false statements.".format(
@@ -157,7 +158,7 @@ def claimant_classification(claims, claimant_model_file):
                 )
             )
         elif pred == 1:
-            explanations[k] = (
+            explanations[claim.id] = (
                 "This is also supported by the fact that the claimant has a mixed "
                 "record, having previously made {} (out of {}) partially "
                 "correct/incorrect statements.".format(
@@ -166,7 +167,7 @@ def claimant_classification(claims, claimant_model_file):
                 )
             )
         else:
-            explanations[k] = (
+            explanations[claim.id] = (
                 "This is also supported by the fact that the claimant has a good "
                 "track record, having previously made "
                 "{} (out of {}) factual statements.".format(
@@ -196,10 +197,10 @@ def _sequence_classification(
 
 def generate_sequence_classification_examples(claims):
     examples = []
-    for k, claim in tqdm(claims.items(), desc="generating examples"):
+    for claim in tqdm(claims, desc="generating examples"):
         examples.append(
             SequenceClassificationExample(
-                guid=k,
+                guid=claim.id,
                 text_a=claim.claim,
                 text_b=(claim.claimant if claim.claimant else "no claimant")
                 + " "
@@ -211,7 +212,7 @@ def generate_sequence_classification_examples(claims):
 
 
 def sequence_classification(
-    examples, pretrained_model_name_or_path, predict_batch_size, nproc
+    claims, pretrained_model_name_or_path, predict_batch_size, nproc
 ):
     examples = generate_sequence_classification_examples(claims)
 
@@ -294,8 +295,8 @@ def generate_support(claims, nproc):
 
     all_support = {}
     for claim, support in tqdm(
-        pool.imap_unordered(_generate_support, claims.values()),
-        total=len(claims.values()),
+        pool.imap_unordered(_generate_support, claims),
+        total=len(claims),
         desc="generating support",
     ):
         all_support[claim.id] = support
@@ -305,15 +306,15 @@ def generate_support(claims, nproc):
 ########## Related Articles ##########
 
 
-def select_related_articles(claims, responses, article_limit=2):
+def select_related_articles(responses, article_limit=2):
     # atm, the most succesful strategy for picking related articles
     # scored by the automated algorithm is using only the api score
     # (we select top article_limit articles since the response hits are sorted
     # by the api score)
     all_articles = {}
 
-    for k, res in tqdm(responses.items(), desc="selecting articles"):
-        claim = claims[k]
+    for res in tqdm(responses, desc="selecting articles"):
+        claim = res["claim"]
         claim.related_articles = {}
         if res["res"] is None:
             continue
@@ -325,8 +326,8 @@ def select_related_articles(claims, responses, article_limit=2):
             if not hit["article"]:
                 continue
             cur_art += 1
-            all_articles[hit["article"].url] = hit["article"]
-            claim.related_articles[hit["article"].url] = hit["article"]
+            all_articles[hit["article"].id] = hit["article"]
+            claim.related_articles[hit["article"].id] = hit["article"]
 
     return all_articles
 
@@ -372,12 +373,8 @@ def convert_html_hits_to_article(res):
         if not article.content or len(article.content) < 32:
             continue
 
-        # note we don't convert to dict here
-        output.append({"score": hit["score"], "article": article})
-
-        # not sure why id is not always being copied to dict, so here's a fix
-        output[-1]["article"].id = hit["url"]
-
+        assert article.url == article.id
+        output.append({"score": hit["score"], "article": article, "url": hit["url"]})
         visited.add(hit["url"])
 
     return output
@@ -394,13 +391,13 @@ def search_pipeline(claim):
 
 def get_responses(claims, nproc):
     pool = multiprocessing.Pool(nproc)
-    responses = {}
+    responses = []
     for claim, query, res in tqdm(
-        pool.imap_unordered(search_pipeline, claims.values()),
+        pool.imap_unordered(search_pipeline, claims),
         total=len(claims),
         desc="fetching query responses",
     ):
-        responses[claim.id] = {"id": claim.id, "res": res, "query": query}
+        responses.append({"claim": claim, "res": res, "query": query})
     return responses
 
 
@@ -419,7 +416,7 @@ if __name__ == "__main__":
 
     # read metadata and convert to claims objects
     _logger.info("... reading claims from {} ...".format(args.metadata_file))
-    claims = claims_from_phase2(args.metadata_file)
+    claims = Phase2Dataset.from_raw(args.metadata_file).claims
 
     # fetch search api responses
     _logger.info("... fetching query responses ...")
@@ -427,7 +424,7 @@ if __name__ == "__main__":
 
     # select related articles
     _logger.info("... selecting related articles ...")
-    articles = select_related_articles(claims, responses)
+    articles = select_related_articles(responses)
 
     # generate supporting article evidence for each claim
     _logger.info("... generating support ...")
@@ -438,6 +435,7 @@ if __name__ == "__main__":
 
     # get sequence classification predictions and explanations
     _logger.info("... generating sequence classification predictions ...")
+    # print(f"\n\n\n\n{len(claims)}\nHEEYYYY IM HERE\n\n\n\n\n\n\n")
     seq_clf_predictions, seq_clf_explanations = sequence_classification(
         claims, args.pretrained_model_name_or_path, args.predict_batch_size, args.nproc,
     )
