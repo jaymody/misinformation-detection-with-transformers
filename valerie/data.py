@@ -29,32 +29,39 @@ class Claim:
         related_articles=None,
         explanation=None,
         support=None,
+        dataset_name=None,
     ):
         """Constructor for Claim."""
         self.id = id
         self.claim = clean_text(claim)[:4000] if claim else None  # restrict num chars
         self.claimant = clean_text(claimant) if claimant else None
         self.label = label
-        self.date = date
+        self.date = str(date)
         self.related_articles = related_articles
         self.explanation = explanation
         self.support = support
+        self.dataset_name = dataset_name
+
+        if dataset_name:
+            self.index = dataset_name + "/" + str(self.id)
+        else:
+            self.index = self.id
 
     def to_dict(self):
         return self.__dict__
 
     @classmethod
     def from_dict(cls, d):
-        if "id" in d:
-            _id = d.pop("id")
-            return cls(_id, **d)
         return cls(**d)
 
     def __repr__(self):
         return json.dumps(self.__dict__, indent=2)
 
     def __eq__(self, other):
-        return self.id == other.id
+        return self.claim == other.claim
+
+    def __hash__(self):
+        return hash(self.claim)
 
 
 class Article:
@@ -66,9 +73,9 @@ class Article:
         content=None,
         title=None,
         source=None,
-        author=None,
         url=None,
         date=None,
+        dataset_name=None,
     ):
         """Constructor for Article."""
         self.id = id
@@ -77,18 +84,20 @@ class Article:
             content[:16000] if content else None
         )  # restrict num chars in claim
         self.source = tldextract.extract(url).domain if url else None
-        self.author = author
         self.url = url
         self.date = date
+        self.dataset_name = dataset_name
+
+        if dataset_name:
+            self.index = dataset_name + "/" + str(self.id)
+        else:
+            self.index = self.id
 
     def to_dict(self):
         return self.__dict__
 
     @classmethod
     def from_dict(cls, d):
-        if "id" in d:
-            _id = d.pop("id")
-            return cls(_id, **d)
         return cls(**d)
 
     @classmethod
@@ -129,156 +138,10 @@ class Article:
         return json.dumps(self.__dict__, indent=2)
 
     def __eq__(self, other):
-        return self.id == other.id
+        return self.index == other.index
 
-
-def load_claims(filepath, as_list=False, verbose=True):
-    with open(filepath) as fi:
-        claims = {
-            int(k): Claim.from_dict(v)
-            for k, v in tqdm(
-                json.load(fi).items(), desc="loading claims", disable=not verbose
-            )
-        }
-
-    if as_list:
-        return sorted(list(claims.values()), key=lambda x: x.id)
-    return claims
-
-
-def save_claims(claims, filepath, **kwargs):
-    with open(filepath, "w") as fo:
-        json.dump({k: v.to_dict() for k, v in claims.items()}, fo, **kwargs)
-
-
-def load_articles(filepath, as_list=False, verbose=True):
-    with open(filepath) as fi:
-        articles = {
-            k: Article.from_dict(v)
-            for k, v in tqdm(
-                json.load(fi).items(), desc="loading articles", disable=not verbose,
-            )
-        }
-
-    if as_list:
-        return sorted(list(articles.values()), key=lambda x: x.id)
-    return articles
-
-
-def save_articles(articles, filepath, **kwargs):
-    with open(filepath, "w") as fo:
-        json.dump({k: v.to_dict() for k, v in articles.items()}, fo, **kwargs)
-
-
-def claims_from_phase1(metadata_file):
-    with open(metadata_file) as fi:
-        claims = {
-            d["id"]: Claim(**d)
-            for d in tqdm(json.load(fi), desc="loading claims from phase1")
-        }
-
-    for claim in claims.values():
-        if not claim.related_articles:
-            raise ValueError("claim {} has no related articles".format(claim.id))
-
-        related_articles_dict = {}
-        for rel_art in claim.related_articles:
-            rel_art = str(rel_art) + ".txt"  # use full filename as id
-            related_articles_dict[rel_art] = None
-        claim.related_articles = related_articles_dict
-
-    return claims
-
-
-def _articles_from_phase1_visit(fpath):
-    with open(fpath) as fi:
-        art_id = os.path.basename(fpath)
-        article = Article.from_txt(art_id, fi.read())
-    return art_id, article
-
-
-def articles_from_phase1(articles_dir, nproc=1):
-    # note 1994 articles exists in the phase1 dataset that aren't a related
-    # article for any of the claims, but we keep them as it's extra data we
-    # may use in a corpus or something
-    fpaths = glob.glob(os.path.join(articles_dir, "*.txt"))
-
-    pool = multiprocessing.Pool(nproc)
-    articles = {}
-    for art_id, article in tqdm(
-        pool.imap_unordered(_articles_from_phase1_visit, fpaths),
-        total=len(fpaths),
-        desc="loading articles from phase1",
-    ):
-        articles[art_id] = article
-
-    return articles
-
-
-def claims_from_phase2(metadata_file):
-    with open(metadata_file) as fi:
-        claims = {
-            d["id"]: Claim(**d)
-            for d in tqdm(json.load(fi), desc="loading claims from phase2")
-        }
-
-    # remove "train_articles" string from related_articles keys
-    for claim in claims.values():
-        if not claim.related_articles:
-            continue
-        keys = list(claim.related_articles.keys())
-        for old_name in keys:
-            new_name = os.path.basename(old_name)
-            claim.related_articles[new_name] = claim.related_articles.pop(old_name)
-
-        for key in claim.related_articles:
-            assert "train" not in key
-
-    return claims
-
-
-def _articles_from_phase2_visit(_input):
-    art_id, fpath, url = _input
-    with open(fpath) as fi:
-        article = Article.from_html(art_id, fi.read(), url=url)
-    return art_id, article
-
-
-def articles_from_phase2(articles_dir, claims, nproc=1):
-    art_id_to_url = {
-        k: v for claim in claims.values() for k, v in claim.related_articles.items()
-    }
-
-    _inputs = []
-    fpaths = glob.glob(os.path.join(articles_dir, "*.html"))
-    for fpath in fpaths:
-        # certain articles are not part of any of the related articles from the claims:
-        # articles = load all articles from articles dir
-        # claims_articles_set = set([art for claim in claims for art in list(claim.related_articles.keys())])#
-        # articles_set = set(articles.keys())
-        # articles_set - claims_articles_set
-        # the above produces 38 entries
-        #
-        # if the article is not found in art_id_to_url, this means none of the claims
-        # ever refer it, so we ignore it
-        try:
-            art_id = os.path.basename(fpath)
-            url = art_id_to_url[art_id]
-            _inputs.append((art_id, fpath, url))
-        except KeyError:
-            continue
-
-    pool = multiprocessing.Pool(nproc)
-    articles = {}
-    for art_id, article in tqdm(
-        pool.imap_unordered(_articles_from_phase2_visit, _inputs),
-        total=len(fpaths),
-        desc="loading article from phase2",
-    ):
-        if art_id is not None:
-            articles[art_id] = article
-
-    return articles
+    def __hash__(self):
+        return hash(self.index)
 
 
 def _save_relevant_articles_phase1(metadata, articles_dir, output_dir):
@@ -317,11 +180,11 @@ def _save_relevant_articles_phase2(metadata, articles_dir, output_dir):
     return len(relevant_articles)
 
 
-def trim_metadata_phase1(claims_file, articles_dir, output_dir, n_examples):
+def trim_metadata_phase1(metadata_file, articles_dir, output_dir, n_examples):
     os.makedirs(os.path.join(output_dir, "articles"))
 
     # load data
-    with open(claims_file, "r") as fi:
+    with open(metadata_file, "r") as fi:
         raw_data = json.load(fi)
 
     # trim down dataset
@@ -337,11 +200,11 @@ def trim_metadata_phase1(claims_file, articles_dir, output_dir, n_examples):
         json.dump(metadata, fo, indent=2)
 
 
-def trim_metadata_phase2(claims_file, articles_dir, output_dir, n_examples=None):
+def trim_metadata_phase2(metadata_file, articles_dir, output_dir, n_examples=None):
     os.makedirs(os.path.join(output_dir, "articles"))
 
     # load data
-    with open(claims_file, "r") as fi:
+    with open(metadata_file, "r") as fi:
         raw_data = json.load(fi)
 
     # trim down dataset
@@ -358,7 +221,7 @@ def trim_metadata_phase2(claims_file, articles_dir, output_dir, n_examples=None)
 
 
 def train_test_split_phase2(
-    claims_file, articles_dir, train_dir, test_dir, train_size, random_state
+    metadata_file, articles_dir, train_dir, test_dir, train_size, random_state
 ):
     from sklearn.model_selection import train_test_split
 
@@ -369,11 +232,11 @@ def train_test_split_phase2(
     os.makedirs(os.path.join(train_dir, "articles"))
     os.makedirs(os.path.join(test_dir, "articles"))
 
-    with open(claims_file, "r") as fi:
+    with open(metadata_file, "r") as fi:
         metadata = json.load(fi)
 
     # log args
-    _logger.info("claims_file:  %s", claims_file)
+    _logger.info("metadata_file:  %s", metadata_file)
     _logger.info("articles_dir: %s", articles_dir)
     _logger.info("train_dir:    %s", train_dir)
     _logger.info("test_dir:     %s", test_dir)
