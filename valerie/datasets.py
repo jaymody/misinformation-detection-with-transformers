@@ -43,11 +43,15 @@ class ValerieDataset:
         for i, row in tqdm(
             df.iterrows(), total=len(df), desc="{} to claims".format(cls.name)
         ):
-            try:
+            # if phase1/phase2, do not try/except an error when parsing df
+            if cls.name == "phase1" or cls.name == "phase2":
                 claims.append(row_to_claim(i, row))
-            except:
-                misses += 1
-                continue
+            else:
+                try:
+                    claims.append(row_to_claim(i, row))
+                except:
+                    misses += 1
+                    continue
         _logger.info("missed row to claim conversions: %d", misses)
         return claims
 
@@ -97,10 +101,13 @@ class Phase1Dataset(ValerieDataset):
         row = dict(row)
         _id = row.pop("id")
 
+        # only parse related articles if it exists
+        # (we do this check since related_articles is a removed field for the eval)
         related_articles = {}
-        for rel_art in row.pop("related_articles"):
-            rel_art = cls.name + "/" + str(rel_art) + ".txt"
-            related_articles[rel_art] = rel_art
+        if "related_articles" in row:
+            for rel_art in row.pop("related_articles"):
+                rel_art = cls.name + "/" + str(rel_art) + ".txt"
+                related_articles[rel_art] = rel_art
 
         return Claim(
             _id, related_articles=related_articles, dataset_name=cls.name, **row
@@ -127,11 +134,6 @@ def _articles_from_phase1_visit(fpath):
         art_id = os.path.basename(fpath)
         article = Article.from_txt(art_id, fi.read(), dataset_name=Phase1Dataset.name)
     return article
-
-
-####
-####
-####
 
 
 class Phase2Dataset(ValerieDataset):
@@ -163,10 +165,13 @@ class Phase2Dataset(ValerieDataset):
         row = dict(row)
         _id = row.pop("id")
 
+        # only parse related articles if it exists
+        # (we do this check since related_articles is a removed field for the eval)
         related_articles = {}
-        for k, v in row.pop("related_articles").items():
-            rel_art = cls.name + "/" + os.path.basename(k)
-            related_articles[rel_art] = v
+        if "related_articles" in row:
+            for k, v in row.pop("related_articles").items():
+                rel_art = cls.name + "/" + os.path.basename(k)
+                related_articles[rel_art] = v
 
         return Claim(
             _id, related_articles=related_articles, dataset_name=cls.name, **row
