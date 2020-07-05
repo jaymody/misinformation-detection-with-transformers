@@ -277,96 +277,6 @@ class SequenceClassificationModel:
 
         return model, train_dataset, test_dataset
 
-    @classmethod
-    def train_kfold_from_pretrained(
-        cls,
-        output_dir,
-        pretrained_model_name_or_path,
-        examples,
-        data_args={},
-        training_args={},
-        config_args={},
-        tokenizer_args={},
-        model_args={},
-        compute_metrics=None,
-        nproc=1,
-    ):
-        if "StratifiedKFold" not in data_args:
-            raise ValueError(
-                "key StratifiedKFold must be in data_args and contain all"
-                "kwargs for sklearn.model_selection.StratifiedKFold."
-            )
-
-        # create output dir and save arg dicts
-        os.makedirs(output_dir)
-        args_dict = {
-            "data_args.json": data_args,
-            "training_args.json": training_args,
-            "config_args.json": config_args,
-            "tokenizer_args.json": tokenizer_args,
-            "model_args.json": model_args,
-        }
-        for k, v in args_dict.items():
-            with open(os.path.join(output_dir, k), "w") as fo:
-                json.dump(v, fo, indent=2)
-
-        # kfold
-        labels = [example.label for example in examples]
-        skf = StratifiedKFold(
-            data_args["StratifiedKFold"]["n_splits"],
-            shuffle=data_args["StratifiedKFold"]["shuffle"],
-            random_state=data_args["StratifiedKFold"]["random_state"],
-        )
-        predictions = {}
-        for k, (train_index, test_index) in tqdm(
-            enumerate(skf.split(examples, labels)),
-            total=data_args["StratifiedKFold"]["n_splits"],
-            desc="fold",
-        ):
-            # create fold dir and save arg dicts
-            fold_dir = os.path.join(output_dir, "fold-{}".format(k))
-            os.makedirs(fold_dir)
-            for k, v in args_dict.items():
-                with open(os.path.join(fold_dir, k), "w") as fo:
-                    json.dump(v, fo, indent=2)
-
-            # init model
-            model = cls.from_pretrained(
-                pretrained_model_name_or_path,
-                config_args=config_args,
-                tokenizer_args=tokenizer_args,
-                model_args=model_args,
-            )
-
-            # convert examples to features datasets
-            train_examples = [examples[i] for i in train_index]
-            test_examples = [examples[i] for i in test_index]
-            train_dataset = model.create_dataset(examples=train_examples, nproc=nproc)
-            test_dataset = model.create_dataset(examples=test_examples, nproc=nproc)
-
-            # train
-            _global_step, _tr_loss = model.train(
-                train_dataset=train_dataset,
-                test_dataset=test_dataset,
-                training_args=SequenceClassificationTrainingArgs(
-                    output_dir=fold_dir, logging_dir=fold_dir, **training_args
-                ),
-                model_path=pretrained_model_name_or_path,
-                compute_metrics=compute_metrics,
-            )
-
-            # predict
-            predict_output = model.predict(
-                predict_dataset=test_dataset,
-                predict_batch_size=training_args["per_device_eval_batch_size"],
-            )
-
-            for example, prob in zip(test_examples, predict_output.predictions):
-                assert example.guid not in predictions
-                predictions[example.guid] = prob
-
-        return predictions
-
     @staticmethod
     def compute_metrics(results):
         labels = results.label_ids
@@ -385,15 +295,9 @@ class SequenceClassificationModel:
         )
 
         weighted_avg = report.pop("weighted avg")
-        (
-            metrics["f1_weighted"],
-            metrics["recall_weighted"],
-            metrics["precision_weighted"],
-        ) = (
-            weighted_avg["f1-score"],
-            weighted_avg["recall"],
-            weighted_avg["precision"],
-        )
+        metrics["f1_weighted"] = weighted_avg["f1-score"]
+        metrics["recall_weighted"] = weighted_avg["recall"]
+        metrics["precision_weighted"] = weighted_avg["precision"]
 
         for k, v in report.items():
             metrics["f1_{}".format(k)] = v["f1-score"]
