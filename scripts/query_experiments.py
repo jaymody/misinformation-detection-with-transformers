@@ -1,6 +1,7 @@
 import os
 import time
 import json
+import pickle
 import random
 import inspect
 import argparse
@@ -10,51 +11,14 @@ import spacy
 from tqdm.auto import tqdm
 
 from valerie import search
-from valerie.data import claims_from_phase2
+from valerie.datasets import Phase2Dataset
 from valerie.utils import get_logger
 from valerie.scoring import validate_predictions_phase2, _compute_score_phase2
 from valerie.preprocessing import clean_text
 
+from query import compute_responses_score
+
 nlp = spacy.load("en_core_web_lg")
-
-
-def compute_query_score(responses, claims):
-    predictions = {}
-    perfect_predictions = {}
-    labels = {}
-
-    for k, v in responses.items():
-        claim = claims[k]
-        labels[claim.id] = claim.to_dict()
-        predictions[claim.id] = {
-            "label": claim.label,
-            "related_articles": [hit["url"] for hit in v["res"]["hits"]["hits"][:2]]
-            if v["res"]
-            else [],
-            "explanation": "",
-        }
-        perfect_predictions[claim.id] = {
-            "label": claim.label,
-            "related_articles": [
-                hit["url"]
-                for hit in v["res"]["hits"]["hits"]
-                if hit["url"] in claim.related_articles.values()
-            ][:2]
-            if v["res"]
-            else [],
-            "explanation": "",
-        }
-
-    validate_predictions_phase2(predictions)
-    score = _compute_score_phase2(labels, predictions)
-    validate_predictions_phase2(perfect_predictions)
-    perfect_score = _compute_score_phase2(labels, perfect_predictions)
-    return {
-        "perfect_score": perfect_score["score"],
-        "perfect_error": perfect_score["error"],
-        "api_score": score["score"],
-        "api_error": score["error"],
-    }
 
 
 def run_config_combinations(query_params):
@@ -158,10 +122,10 @@ if __name__ == "__main__":
         fo.write(inspect.getsource(query_func))
 
     _logger = get_logger(os.path.join(args.output_dir, "log.txt"))
-    claims = claims_from_phase2(args.metadata_file)
+    claims = Phase2Dataset.from_raw(args.metadata_file).claims
     random.seed(args.seed)
     n_samples = args.n_samples if args.n_samples is not None else len(claims)
-    run_claims = random.sample(list(claims.values()), n_samples)
+    run_claims = random.sample(claims, n_samples)
     run_configs = run_config_combinations(args.query_params)
 
     output = {}
@@ -170,7 +134,7 @@ if __name__ == "__main__":
         _logger.info("config: %s", json.dumps(run_config, indent=2))
         time.sleep(1)  # sleep so logging isn't interupted
 
-        responses = {}
+        responses = []
         for claim in tqdm(run_claims):
             claim, query, res = query_func(claim, **run_config)
 
@@ -179,12 +143,12 @@ if __name__ == "__main__":
                 for hit in res["hits"]["hits"]:
                     hit["content"] = ""
 
-            responses[claim.id] = {"id": claim.id, "query": query, "res": res}
+            responses.append({"claim": claim, "query": query, "res": res})
 
-        scores = compute_query_score(responses, claims)
+        scores = compute_responses_score(responses)
         _logger.info("scores: %s", json.dumps(scores, indent=2))
 
         output[i] = {"config": run_config, "scores": scores}
 
-    with open(os.path.join(args.output_dir, "results.json"), "w") as fo:
-        json.dump(output, fo, indent=2)
+    with open(os.path.join(args.output_dir, "results.json"), "wb") as fo:
+        pickle.dump(output, fo)

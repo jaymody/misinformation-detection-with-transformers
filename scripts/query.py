@@ -1,4 +1,5 @@
 import json
+import pickle
 import argparse
 import multiprocessing
 
@@ -6,7 +7,8 @@ import spacy
 from tqdm.auto import tqdm
 
 from valerie import search
-from valerie.data import Article, claims_from_phase2
+from valerie.data import Article
+from valerie.datasets import Phase2Dataset
 from valerie.utils import get_logger
 from valerie.scoring import validate_predictions_phase2, _compute_score_phase2
 from valerie.preprocessing import clean_text
@@ -16,19 +18,17 @@ _logger = get_logger()
 nlp = spacy.load("en_core_web_lg")
 
 
-def compute_query_score(responses, claims):
+def compute_responses_score(responses):
     predictions = {}
     perfect_predictions = {}
     labels = {}
 
-    for k, v in responses.items():
-        claim = claims[k]
+    for v in responses:
+        claim = v["claim"]
         labels[claim.id] = claim.to_dict()
         predictions[claim.id] = {
             "label": claim.label,
-            "related_articles": [
-                hit["article"]["url"] for hit in v["res"]["hits"]["hits"][:2]
-            ]
+            "related_articles": [hit["url"] for hit in v["res"]["hits"]["hits"][:2]]
             if v["res"]
             else [],
             "explanation": "",
@@ -36,9 +36,9 @@ def compute_query_score(responses, claims):
         perfect_predictions[claim.id] = {
             "label": claim.label,
             "related_articles": [
-                hit["article"]["url"]
+                hit["url"]
                 for hit in v["res"]["hits"]["hits"]
-                if hit["article"]["url"] in claim.related_articles.values()
+                if hit["url"] in claim.related_articles.values()
             ][:2]
             if v["res"]
             else [],
@@ -57,7 +57,7 @@ def compute_query_score(responses, claims):
     }
 
 
-def generate_query(claim):
+def query_expansion(claim):
     claim_doc = nlp(claim.claim, disable=["textcat", "tagger", "parser", "ner"])
 
     # stopword removal
@@ -93,18 +93,14 @@ def convert_html_hits_to_article(res):
         if not article.content or len(article.content) < 32:
             continue
 
-        output.append({"score": hit["score"], "article": article.to_dict()})
-
-        # not sure why id is not always being copied to dict, so here's a fix
-        output[-1]["article"]["id"] = hit["url"]
-
+        output.append({"score": hit["score"], "article": article, "url": hit["url"]})
         visited.add(hit["url"])
 
     return output
 
 
 def pipeline(claim):
-    query = generate_query(claim)
+    query = query_expansion(claim)
     res = search.query(query)
     if res:
         res["hits"]["hits"] = convert_html_hits_to_article(res)
@@ -118,24 +114,19 @@ if __name__ == "__main__":
     parser.add_argument("--nproc", type=int, default=4)
     args = parser.parse_args()
 
-    claims = claims_from_phase2(args.metadata_file)
-    run_claims = list(claims.values())
+    claims = Phase2Dataset.from_raw(args.metadata_file).claims[:2]
 
     pool = multiprocessing.Pool(args.nproc)
-    responses = {}
+    responses = []
     for claim, query, res in tqdm(
-        pool.imap_unordered(pipeline, run_claims),
-        total=len(run_claims),
+        pool.imap_unordered(pipeline, claims),
+        total=len(claims),
         desc="fetching responses",
     ):
-        responses[claim.id] = {"id": claim.id, "res": res, "query": query}
+        responses.append({"claim": claim, "res": res, "query": query})
 
-    with open(args.output_file, "w") as fo:
-        json.dump(responses, fo, indent=2)
+    with open(args.output_file, "wb") as fo:
+        pickle.dump(responses, fo)
 
-    _logger.info(
-        "Missed Queries: %d", sum(1 for v in responses.values() if v["res"] is None)
-    )
-    _logger.info(
-        "Scores: %s", json.dumps(compute_query_score(responses, claims), indent=2)
-    )
+    _logger.info("Missed Queries: %d", sum(1 for v in responses if v["res"] is None))
+    _logger.info("Scores: %s", json.dumps(compute_responses_score(responses), indent=2))
