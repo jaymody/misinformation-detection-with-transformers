@@ -114,7 +114,7 @@ if __name__ == "__main__":
     parser.add_argument("--nproc", type=int, default=4)
     args = parser.parse_args()
 
-    claims = Phase2Dataset.from_raw(args.metadata_file).claims[:2]
+    claims = Phase2Dataset.from_raw(args.metadata_file).claims
 
     pool = multiprocessing.Pool(args.nproc)
     responses = []
