@@ -194,6 +194,14 @@ class SequenceClassificationModel:
             shutil.rmtree(_temp_dir, ignore_errors=True)
         return trainer.predict(test_dataset=predict_dataset)
 
+    @staticmethod
+    def load_examples(examples_file):
+        with open(examples_file) as fi:
+            examples = [
+                SequenceClassificationExample(**example) for example in json.load(fi)
+            ]
+        return examples
+
     @classmethod
     def from_pretrained(
         cls,
@@ -268,14 +276,6 @@ class SequenceClassificationModel:
         )
 
         return model, train_dataset, test_dataset
-
-    @staticmethod
-    def load_examples(examples_file):
-        with open(examples_file) as fi:
-            examples = [
-                SequenceClassificationExample(**example) for example in json.load(fi)
-            ]
-        return examples
 
     @classmethod
     def train_kfold_from_pretrained(
