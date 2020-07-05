@@ -1,14 +1,14 @@
 ### Project ###
-archive/
-logs/
-submissions/
-data/
-legal/
-info/
-models/
-run_compile
-run_vm
-todo.md
+/archive/
+/logs/
+/submissions/
+/data/
+/legal/
+/info/
+/models/
+/run_compile
+/run_vm
+/todo.md
 _*.ipynb
 .envrc
 
