@@ -77,7 +77,7 @@ class Phase1Dataset(ValerieDataset):
 
     @classmethod
     def from_raw(
-        cls, metadata_file="data/phase2-1/raw/metadata.json", articles_dir=None, nproc=1
+        cls, metadata_file="data/phase1/raw/metadata.json", articles_dir=None, nproc=1
     ):
         # because pandas logging sucks
         if not os.path.isfile(metadata_file):
@@ -143,7 +143,7 @@ class Phase2Dataset(ValerieDataset):
 
     @classmethod
     def from_raw(
-        cls, metadata_file="data/phase1/raw/metadata.json", articles_dir=None, nproc=1
+        cls, metadata_file="data/phase2-1/raw/metadata.json", articles_dir=None, nproc=1
     ):
         # because pandas logging sucks
         if not os.path.isfile(metadata_file):
