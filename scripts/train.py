@@ -17,8 +17,6 @@ _logger = get_logger()
 
 os.environ["WANDB_WATCH"] = "false"  # we don't need to watch gradients
 os.environ["WANDB_PROJECT"] = "valerie"  # project
-os.environ["WANDB_DISABLED"] = False  # set to false on test runs
-# os.environ["WANDB_MODE"] = "dryrun" # uncomment this if you don't want to upload
 
 models_dir = "models"
 task_type = "fnc"
@@ -99,26 +97,28 @@ def default_train_test_split_args():
     return {"train_size": 0.8, "random_state": 42}
 
 
-def default_valerie_dataset_name():
+def default_valerie_dataset():
     return Phase2Dataset.__name__
 
 
 def construct_run_config_with_defaults(run_config):
     new_cfg = {}
     new_cfg["training_args"] = default_training_args(
-        is_large="large" in new_cfg["pretrained_model_name_or_path"]
+        is_large="large" in run_config["pretrained_model_name_or_path"]
     )
     new_cfg["config_args"] = default_config_args()
     new_cfg["tokenizer_args"] = default_tokenizer_args()
     new_cfg["model_args"] = default_model_args()
     new_cfg["train_test_split_args"] = default_train_test_split_args()
-    new_cfg["valerie_dataset_name"] = default_valerie_dataset_name()
+    new_cfg["valerie_dataset"] = default_valerie_dataset()
 
     # update new_cfg with new values (shallow)
     for topic in run_config:
         if topic in new_cfg:
             for k, v in topic.items():
                 new_cfg[topic][k] = v
+        else:
+            new_cfg[topic] = run_config[topic]
 
     return new_cfg
 
@@ -148,7 +148,7 @@ def get_examples(run_config):
 
     _labels = [example.label for example in examples]
     train_examples, eval_examples, _, _ = train_test_split(
-        examples, _labels, stratify=_labels, **run_config["train_test_split"]
+        examples, _labels, stratify=_labels, **run_config["train_test_split_args"]
     )
 
     return train_examples, eval_examples
@@ -157,13 +157,18 @@ def get_examples(run_config):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--nproc", type=int, default=1)
-    nproc = parser.parse_args().nproc
+    parser.add_argument("--test_mode", type=bool, default=False)
+    parser_args = parser.parse_args()
+
+    if parser_args.test_mode:
+        os.environ["WANDB_MODE"] = "dryrun"  # don't upload experiment upload
 
     for i, run_config in enumerate(tqdm(run_configs, desc="run")):
         # setup run config, name, wandb integration, output dir, etc ...
         run_config = construct_run_config_with_defaults(run_config)
-        run_name = group_name + "-" + int(i)
+        run_name = group_name + "-" + str(i)
         output_dir = os.path.join(base_dir, run_name)
+        os.makedirs(output_dir)
         run = wandb.init(
             name=run_name,
             tags=[task_type],
@@ -172,6 +177,11 @@ if __name__ == "__main__":
             reinit=True,
             allow_val_change=True,
         )
+
+        if parser_args.test_mode:
+            run_config["training_args"]["max_steps"] = 8
+            run_config["training_args"]["warmup_steps"] = 2
+            run_config["training_args"]["logging_steps"] = 4
 
         # execute the run
         with run:
@@ -204,5 +214,6 @@ if __name__ == "__main__":
                 config_args=run_config["config_args"],
                 tokenizer_args=run_config["tokenizer_args"],
                 model_args=run_config["model_args"],
-                nproc=nproc,
+                exist_ok=True,
+                nproc=parser_args.nproc,
             )
