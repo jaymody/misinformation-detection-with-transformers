@@ -238,9 +238,10 @@ class SequenceClassificationModel:
         tokenizer_args={},
         model_args={},
         compute_metrics=None,
+        exist_ok=False,
         nproc=1,
     ):
-        os.makedirs(output_dir)
+        os.makedirs(output_dir, exist_ok=exist_ok)
         with open(os.path.join(output_dir, "training_args.json"), "w") as fo:
             json.dump(training_args, fo, indent=2)
         with open(os.path.join(output_dir, "config_args.json"), "w") as fo:
