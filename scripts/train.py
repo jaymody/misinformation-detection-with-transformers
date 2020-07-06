@@ -27,7 +27,7 @@ if os.path.isdir(base_dir):
 
 run_configs = [
     {"pretrained_model_name_or_path": "bert-base-cased"},
-    {"pretrained_model_name_or_path": "robert-base"},
+    {"pretrained_model_name_or_path": "roberta-base"},
     {"pretrained_model_name_or_path": "bert-large-cased"},
     {"pretrained_model_name_or_path": "roberta-large"},
     {"pretrained_model_name_or_path": "xlnet-base-cased"},
