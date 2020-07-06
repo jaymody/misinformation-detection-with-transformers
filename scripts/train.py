@@ -22,6 +22,8 @@ models_dir = "models"
 task_type = "fnc"
 group_name = "initial_test_run"
 base_dir = os.path.join(models_dir, task_type, group_name)
+if os.path.isdir(base_dir):
+    raise ValueError("base_dir {} already exists".format(base_dir))
 
 run_configs = [
     {"pretrained_model_name_or_path": "bert-base-cased"},
@@ -42,17 +44,17 @@ def default_training_args(is_large=False):
     if is_large:
         return {
             "evaluate_during_training": True,
-            "per_device_train_batch_size": 16 / 8,
-            "per_device_eval_batch_size": 16 / 8,
+            "per_device_train_batch_size": 16,
+            "per_device_eval_batch_size": 16,
             "gradient_accumulation_steps": 1,
             "learning_rate": 5e-5,
             "weight_decay": 0.00,
             "adam_epsilon": 1e-6,
             "max_grad_norm": 1.0,
-            "num_train_epochs": 8,
-            "warmup_steps": 100 * 8,
+            "num_train_epochs": 16,
+            "warmup_steps": 100,
             "logging_first_step": False,
-            "logging_steps": 25 * 8,
+            "logging_steps": 25,
             "save_steps": 1e9,
             "save_total_limit": 1,
             "seed": 42,
@@ -60,17 +62,17 @@ def default_training_args(is_large=False):
     else:
         return {
             "evaluate_during_training": True,
-            "per_device_train_batch_size": 32 / 16,
-            "per_device_eval_batch_size": 32 / 16,
+            "per_device_train_batch_size": 32,
+            "per_device_eval_batch_size": 32,
             "gradient_accumulation_steps": 1,
             "learning_rate": 5e-5,
             "weight_decay": 0.00,
             "adam_epsilon": 1e-6,
             "max_grad_norm": 1.0,
-            "num_train_epochs": 16,
-            "warmup_steps": 50 * 16,
+            "num_train_epochs": 32,
+            "warmup_steps": 50,
             "logging_first_step": False,
-            "logging_steps": 15 * 16,
+            "logging_steps": 15,
             "save_steps": 1e9,
             "save_total_limit": 1,
             "seed": 42,
