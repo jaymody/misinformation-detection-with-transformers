@@ -76,7 +76,9 @@ class Phase1Dataset(ValerieDataset):
     name = "phase1"
 
     @classmethod
-    def from_raw(cls, metadata_file, articles_dir=None, nproc=1):
+    def from_raw(
+        cls, metadata_file="data/phase2-1/raw/metadata.json", articles_dir=None, nproc=1
+    ):
         # because pandas logging sucks
         if not os.path.isfile(metadata_file):
             raise ValueError(
@@ -140,7 +142,9 @@ class Phase2Dataset(ValerieDataset):
     name = "phase2"
 
     @classmethod
-    def from_raw(cls, metadata_file, articles_dir=None, nproc=1):
+    def from_raw(
+        cls, metadata_file="data/phase1/raw/metadata.json", articles_dir=None, nproc=1
+    ):
         # because pandas logging sucks
         if not os.path.isfile(metadata_file):
             raise ValueError(
@@ -226,7 +230,15 @@ class FakeNewsTop50Dataset(ValerieDataset):
     name = "fake_news_top50"
 
     @classmethod
-    def from_raw(cls, top_csv, sites_csvs=[]):
+    def from_raw(
+        cls,
+        top_csv="data/external/2018-12-fake-news-top-50/data/top_2018.csv",
+        sites_csvs=[
+            "data/external/2018-12-fake-news-top-50/data/sites_2016.csv",
+            "data/external/2018-12-fake-news-top-50/data/sites_2017.csv",
+            "data/external/2018-12-fake-news-top-50/data/sites_2018.csv",
+        ],
+    ):
         df = pd.read_csv(top_csv)
 
         sites = []
@@ -260,7 +272,7 @@ class FakeNewsKaggleDataset(ValerieDataset):
     name = "fake_news_kaggle"
 
     @classmethod
-    def from_raw(cls, train_csv):
+    def from_raw(cls, train_csv="data/external/fake-news/train.csv"):
         df = pd.read_csv(train_csv)
         dataset = cls(cls.df_to_claims(df, cls.row_to_claim))
         dataset.df = df
@@ -287,10 +299,10 @@ class FakeNewsNetDataset(ValerieDataset):
     @classmethod
     def from_raw(
         cls,
-        politifact_fake_csv,
-        politifact_real_csv,
-        gossipcop_fake_csv,
-        gossipcop_real_csv,
+        politifact_fake_csv="data/external/FakeNewsNet/dataset/politifact_fake.cs",
+        politifact_real_csv="data/external/FakeNewsNet/dataset/politifact_real.cs",
+        gossipcop_fake_csv="data/external/FakeNewsNet/dataset/gossipcop_fake.cs",
+        gossipcop_real_csv="data/external/FakeNewsNet/dataset/gossipcop_real.cs",
         name="fake_news_net",
     ):
         df = pd.concat(
@@ -324,7 +336,7 @@ class GeorgeMcIntireDataset(ValerieDataset):
     name = "george_mcintire"
 
     @classmethod
-    def from_raw(cls, data_csv):
+    def from_raw(cls, data_csv="data/external/george-mcintire/fake_or_real_news.csv"):
         df = pd.read_csv(data_csv, skiprows=1, names=["id", "title", "text", "label"])
         dataset = cls(cls.df_to_claims(df, cls.row_to_claim))
         dataset.df = df
@@ -346,7 +358,11 @@ class ISOTDataset(ValerieDataset):
     name = "isot"
 
     @classmethod
-    def from_raw(cls, fake_csv, true_csv):
+    def from_raw(
+        cls,
+        fake_csv="data/external/ISOT/Fake.csv",
+        true_csv="data/external/ISOT/True.csv",
+    ):
         df = pd.concat(
             [
                 pd.read_csv(fake_csv).assign(label=0),
@@ -386,7 +402,7 @@ class LiarDataset(ValerieDataset):
     name = "liar"
 
     @classmethod
-    def from_raw(cls, data_tsv):
+    def from_raw(cls, data_tsv="data/external/liar/train.tsv"):
         df = pd.read_csv(
             data_tsv,
             sep="\t",
@@ -436,7 +452,7 @@ class MrisdalDataset(ValerieDataset):
     name = "mrisdal"
 
     @classmethod
-    def from_raw(cls, data_csv):
+    def from_raw(cls, data_csv="data/external/mrisdal/fake.csv"):
         df = pd.read_csv(data_csv)
         dataset = cls(cls.df_to_claims(df, cls.row_to_claim))
         dataset.df = df
@@ -467,45 +483,17 @@ class CombinedDataset(ValerieDataset):
     name = "combined"
 
     @classmethod
-    def from_raw(cls, data_dir="data"):
-        def _join(path):
-            return os.path.join(data_dir, path)
-
+    def from_raw(cls):
         datasets = [
-            Phase2Dataset.from_raw(_join("phase2-1/raw/metadata.json")),
-            Phase1Dataset.from_raw(_join("phase1/raw/metadata.json")),
-            FakeNewsTop50Dataset.from_raw(
-                _join("external/2018-12-fake-news-top-50/data/top_2018.csv"),
-                sites_csvs=[
-                    _join("external/2018-12-fake-news-top-50/data/sites_2016.csv"),
-                    _join("external/2018-12-fake-news-top-50/data/sites_2017.csv"),
-                    _join("external/2018-12-fake-news-top-50/data/sites_2018.csv"),
-                ],
-            ),
-            FakeNewsKaggleDataset.from_raw(_join("external/fake-news/train.csv")),
-            FakeNewsNetDataset.from_raw(
-                politifact_fake_csv=_join(
-                    "external/FakeNewsNet/dataset/politifact_fake.csv"
-                ),
-                politifact_real_csv=_join(
-                    "external/FakeNewsNet/dataset/politifact_real.csv"
-                ),
-                gossipcop_fake_csv=_join(
-                    "external/FakeNewsNet/dataset/gossipcop_fake.csv"
-                ),
-                gossipcop_real_csv=_join(
-                    "external/FakeNewsNet/dataset/gossipcop_real.csv"
-                ),
-            ),
-            GeorgeMcIntireDataset.from_raw(
-                _join("external/george-mcintire/fake_or_real_news.csv")
-            ),
-            ISOTDataset.from_raw(
-                fake_csv=_join("external/ISOT/Fake.csv"),
-                true_csv=_join("external/ISOT/True.csv"),
-            ),
-            LiarDataset.from_raw(_join("external/liar/train.tsv")),
-            MrisdalDataset.from_raw(_join("external/mrisdal/fake.csv")),
+            Phase2Dataset.from_raw(),
+            Phase1Dataset.from_raw(),
+            FakeNewsTop50Dataset.from_raw(),
+            FakeNewsKaggleDataset.from_raw(),
+            FakeNewsNetDataset.from_raw(),
+            GeorgeMcIntireDataset.from_raw(),
+            ISOTDataset.from_raw(),
+            LiarDataset.from_raw(),
+            MrisdalDataset.from_raw(),
         ]
 
         # IMPORTANT that phase2 is first dataset in datasets and combined_claims_set
