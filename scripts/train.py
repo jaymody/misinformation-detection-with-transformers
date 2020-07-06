@@ -22,7 +22,7 @@ os.environ["WANDB_DISABLED"] = False  # set to false on test runs
 
 models_dir = "models"
 task_type = "fnc"
-group_name = "phase2_data_only_pretrained_benchmarks"
+group_name = "initial_test_run"
 base_dir = os.path.join(models_dir, task_type, group_name)
 
 run_configs = [
@@ -44,17 +44,17 @@ def default_training_args(is_large=False):
     if is_large:
         return {
             "evaluate_during_training": True,
-            "per_device_train_batch_size": 16,
-            "per_device_eval_batch_size": 16,
+            "per_device_train_batch_size": 16 / 8,
+            "per_device_eval_batch_size": 16 / 8,
             "gradient_accumulation_steps": 1,
             "learning_rate": 5e-5,
             "weight_decay": 0.00,
             "adam_epsilon": 1e-6,
             "max_grad_norm": 1.0,
             "num_train_epochs": 8,
-            "warmup_steps": 100,
+            "warmup_steps": 100 * 8,
             "logging_first_step": False,
-            "logging_steps": 25,
+            "logging_steps": 25 * 8,
             "save_steps": 1e9,
             "save_total_limit": 1,
             "seed": 42,
@@ -62,17 +62,17 @@ def default_training_args(is_large=False):
     else:
         return {
             "evaluate_during_training": True,
-            "per_device_train_batch_size": 32,
-            "per_device_eval_batch_size": 32,
+            "per_device_train_batch_size": 32 / 16,
+            "per_device_eval_batch_size": 32 / 16,
             "gradient_accumulation_steps": 1,
             "learning_rate": 5e-5,
             "weight_decay": 0.00,
             "adam_epsilon": 1e-6,
             "max_grad_norm": 1.0,
             "num_train_epochs": 16,
-            "warmup_steps": 50,
+            "warmup_steps": 50 * 16,
             "logging_first_step": False,
-            "logging_steps": 15,
+            "logging_steps": 15 * 16,
             "save_steps": 1e9,
             "save_total_limit": 1,
             "seed": 42,
@@ -160,11 +160,9 @@ if __name__ == "__main__":
     nproc = parser.parse_args().nproc
 
     for i, run_config in enumerate(tqdm(run_configs, desc="run")):
-        # update run
+        # setup run config, name, wandb integration, output dir, etc ...
         run_config = construct_run_config_with_defaults(run_config)
-        run_name = (
-            group_name + ""
-        )  ####################################################### TODO
+        run_name = group_name + "-" + int(i)
         output_dir = os.path.join(base_dir, run_name)
         run = wandb.init(
             name=run_name,
@@ -174,6 +172,8 @@ if __name__ == "__main__":
             reinit=True,
             allow_val_change=True,
         )
+
+        # execute the run
         with run:
             _logger.info(
                 "\n\n\n%s%s%s\n%s\n\n\n",
