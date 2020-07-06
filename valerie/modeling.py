@@ -156,7 +156,7 @@ class SequenceClassificationModel:
     def train(
         self,
         train_dataset,
-        test_dataset,
+        eval_dataset,
         training_args,
         compute_metrics=None,
         model_path=None,
@@ -168,7 +168,7 @@ class SequenceClassificationModel:
             model=self.model,
             args=training_args,
             train_dataset=train_dataset,
-            eval_dataset=test_dataset,
+            eval_dataset=eval_dataset,
             compute_metrics=compute_metrics,
         )
         _global_step, _tr_loss = trainer.train(model_path=model_path)
@@ -232,8 +232,7 @@ class SequenceClassificationModel:
         output_dir,
         pretrained_model_name_or_path,
         train_examples,
-        test_examples=None,
-        data_args={},
+        eval_examples=None,
         training_args={},
         config_args={},
         tokenizer_args={},
@@ -242,8 +241,6 @@ class SequenceClassificationModel:
         nproc=1,
     ):
         os.makedirs(output_dir)
-        with open(os.path.join(output_dir, "data_args.json"), "w") as fo:
-            json.dump(data_args, fo, indent=2)
         with open(os.path.join(output_dir, "training_args.json"), "w") as fo:
             json.dump(training_args, fo, indent=2)
         with open(os.path.join(output_dir, "config_args.json"), "w") as fo:
@@ -261,7 +258,7 @@ class SequenceClassificationModel:
         )
 
         train_dataset = model.create_dataset(examples=train_examples, nproc=nproc)
-        test_dataset = model.create_dataset(examples=test_examples, nproc=nproc)
+        eval_dataset = model.create_dataset(examples=eval_examples, nproc=nproc)
 
         training_args = SequenceClassificationTrainingArgs(
             output_dir=output_dir, logging_dir=output_dir, **training_args
@@ -269,13 +266,13 @@ class SequenceClassificationModel:
 
         _global_step, _tr_loss = model.train(
             train_dataset=train_dataset,
-            test_dataset=test_dataset,
+            eval_dataset=eval_dataset,
             training_args=training_args,
             model_path=pretrained_model_name_or_path,
             compute_metrics=compute_metrics,
         )
 
-        return model, train_dataset, test_dataset
+        return model, train_dataset, eval_dataset
 
     @staticmethod
     def compute_metrics(results):
