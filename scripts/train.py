@@ -12,8 +12,6 @@ from valerie.utils import get_logger
 from valerie.datasets import Phase2Dataset
 from valerie.modeling import SequenceClassificationModel, SequenceClassificationExample
 
-_logger = get_logger()
-
 
 os.environ["WANDB_WATCH"] = "false"  # we don't need to watch gradients
 os.environ["WANDB_PROJECT"] = "valerie"  # project
@@ -22,16 +20,34 @@ models_dir = "models"
 task_type = "fnc"
 group_name = "initial_test_run"
 base_dir = os.path.join(models_dir, task_type, group_name)
-if os.path.isdir(base_dir):
-    raise ValueError("base_dir {} already exists".format(base_dir))
+
+# creates dir or throws an error if it already exists
+os.makedirs(base_dir)
+_logger = get_logger(os.path.join(base_dir, "experiment.log"))
 
 run_configs = [
     {"pretrained_model_name_or_path": "bert-base-cased"},
     {"pretrained_model_name_or_path": "roberta-base"},
     {"pretrained_model_name_or_path": "bert-large-cased"},
     {"pretrained_model_name_or_path": "roberta-large"},
-    {"pretrained_model_name_or_path": "xlnet-base-cased"},
-    {"pretrained_model_name_or_path": "xlnet-large-cased"},
+    {
+        "pretrained_model_name_or_path": "xlnet-base-cased",
+        "training_args": {
+            "per_device_train_batch_size": 16,
+            "per_device_eval_batch_size": 16,
+            "warmup_steps": 100,
+            "logging_steps": 30,
+        },
+    },
+    {
+        "pretrained_model_name_or_path": "xlnet-large-cased",
+        "training_args": {
+            "per_device_train_batch_size": 8,
+            "per_device_eval_batch_size": 8,
+            "warmup_steps": 200,
+            "logging_steps": 30,
+        },
+    },
     {"pretrained_model_name_or_path": "t5-base"},
     {"pretrained_model_name_or_path": "t5-large"},
     {"pretrained_model_name_or_path": "albert-base-v2"},
