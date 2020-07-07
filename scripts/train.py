@@ -182,6 +182,7 @@ if __name__ == "__main__":
             run_config["training_args"]["max_steps"] = 8
             run_config["training_args"]["warmup_steps"] = 2
             run_config["training_args"]["logging_steps"] = 4
+            run_config["training_args"]["eval_steps"] = 4
 
         # execute the run
         with run:
