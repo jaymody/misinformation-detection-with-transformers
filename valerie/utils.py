@@ -1,42 +1,36 @@
 """Utility functions."""
 import logging
 
-import tqdm
+from tqdm.auto import tqdm
 
 _logger = logging.getLogger(__name__)
 
 
-class TqdmLoggingHandler(logging.Handler):
-    def __init__(self, level=logging.NOTSET):
-        super().__init__(level)
+class TqdmHandler(logging.StreamHandler):
+    def __init__(self):
+        logging.StreamHandler.__init__(self)
 
     def emit(self, record):
-        try:
-            msg = self.format(record)
-            tqdm.tqdm.write(msg)
-            self.flush()
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except:
-            self.handleError(record)
+        msg = self.format(record)
+        tqdm.write(msg)
 
 
 def get_logger(logfile=None):
     """Gets a nicely formatted logger."""
     formatter = logging.Formatter("[%(asctime)s] %(levelname)s:%(name)s: %(message)s")
-    sh = logging.StreamHandler()
+    sh = TqdmHandler()
     sh.setLevel(logging.INFO)
     sh.setFormatter(formatter)
 
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    logger.handlers = [sh, TqdmLoggingHandler()]
+    logger.addHandler(sh)
 
     if logfile:
         fh = logging.FileHandler(logfile)
         fh.setLevel(logging.INFO)
         fh.setFormatter(formatter)
-        logger.handlers.append(fh)
+        logger.addHandler(fh)
 
     return logger
 
