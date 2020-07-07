@@ -144,6 +144,27 @@ class Article:
         return hash(self.index)
 
 
+def combine_claims(claims_lists, logging_names=None):
+    """The head of the list has most priority during union, the tail has the least."""
+    if logging_names and len(claims_lists) != len(logging_names):
+        raise ValueError("len claims_list must be equal to len logging_names")
+    _logger.info("... combining claims ...")
+    combined_claims_set = set()
+    for i, claims in enumerate(claims_lists):
+        prev_len = len(combined_claims_set)
+        combined_claims_set = combined_claims_set | set(claims)
+        _logger.info(
+            "%s: %d --> %d (+ %d = %d - %d)",
+            logging_names[i] if logging_names else str(i),
+            prev_len,
+            len(combined_claims_set),
+            len(combined_claims_set) - prev_len,
+            len(claims),
+            prev_len + len(claims) - len(combined_claims_set),
+        )
+    return list(combined_claims_set)
+
+
 def _save_relevant_articles_phase1(metadata, articles_dir, output_dir):
     # find set of relevant articles in trimmed down dataset
     relevant_articles = set()

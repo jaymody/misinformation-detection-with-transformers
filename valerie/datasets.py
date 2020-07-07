@@ -7,8 +7,9 @@ import multiprocessing
 import tldextract
 import pandas as pd
 from tqdm.auto import tqdm
+from sklearn.model_selection import train_test_split
 
-from valerie.data import Claim, Article
+from valerie.data import Claim, Article, combine_claims
 
 _logger = logging.getLogger(__name__)
 
@@ -36,6 +37,48 @@ class ValerieDataset:
                 len(articles),
                 len(self.articles),
             )
+
+    def train_test_split(self, **kwargs):
+        _logger.info("... performing train_test_split ...",)
+        _labels = [claim.label for claim in self.claims]
+        train_claims, test_claims, _, _ = train_test_split(
+            self.claims, _labels, stratify=_labels, **kwargs
+        )
+        self.train_claims = train_claims
+        self.test_claims = test_claims
+
+        _logger.info("len of all claims:    %d", len(self.claims))
+        _logger.info("len of train claims:  %d", len(self.train_claims))
+        _logger.info("len of test claims:   %d", len(self.test_claims))
+
+    def train_test_split_subdataset(self, subdataset_name, **kwargs):
+        """Train test split for a subdataset of a combined dataset.
+
+        Performs a train test split on the specified subdataset that's within the
+        current combined dataset. This is useful if you want all your test data
+        to only come from a single dataset, rather than all the combined ones.
+        """
+        _logger.info(
+            "... performing train_test_split_subdataset on subdataset %s ...",
+            subdataset_name,
+        )
+        sub_claims = [
+            claim for claim in self.claims if claim.dataset_name == subdataset_name
+        ]
+        not_sub_claims = [
+            claim for claim in self.claims if claim.dataset_name != subdataset_name
+        ]
+
+        sub_labels = [claim.label for claim in sub_claims]
+        train_claims, test_claims, _, _ = train_test_split(
+            sub_claims, sub_labels, stratify=sub_labels, **kwargs
+        )
+        self.train_claims = train_claims + not_sub_claims
+        self.test_claims = test_claims
+
+        _logger.info("len of all claims:    %d", len(self.claims))
+        _logger.info("len of train claims:  %d", len(self.train_claims))
+        _logger.info("len of test claims:   %d", len(self.test_claims))
 
     @classmethod
     def df_to_claims(cls, df, row_to_claim):
@@ -466,43 +509,54 @@ class MrisdalDataset(ValerieDataset):
 ####################
 
 
-class CombinedDataset(ValerieDataset):
+class LeadersDataset(ValerieDataset):
     @classmethod
     def from_raw(cls):
         datasets = [
             Phase2Dataset.from_raw(),
             Phase1Dataset.from_raw(),
-            FakeNewsTop50Dataset.from_raw(),
-            FakeNewsKaggleDataset.from_raw(),
-            FakeNewsNetDataset.from_raw(),
-            GeorgeMcIntireDataset.from_raw(),
-            ISOTDataset.from_raw(),
-            LiarDataset.from_raw(),
-            MrisdalDataset.from_raw(),
         ]
 
-        # IMPORTANT that phase2 is first dataset in datasets and combined_claims_set
-        # is on the left side of the union. The elements of the left set will be used
-        # for the new set in a union, and we want phase2 claims to override
-        # other claims since it has more useful and complete data. This also means,
-        # the order of the datasets should follow the priority of their information
         assert isinstance(datasets[0], Phase2Dataset)
+        return cls(combine_datasets_claims(datasets))
 
-        _logger.info("... constructing combined dataset ...")
-        combined_claims_set = set()
-        for dataset in datasets:
-            prev_len = len(combined_claims_set)
-            combined_claims_set = combined_claims_set | set(dataset.claims)
-            _logger.info(
-                "%s: %d --> %d (+ %d = %d - %d)",
-                dataset.__class__.__name__,
-                prev_len,
-                len(combined_claims_set),
-                len(combined_claims_set) - prev_len,
-                len(dataset.claims),
-                prev_len + len(dataset.claims) - len(combined_claims_set),
-            )
-        return cls(list(combined_claims_set))
+
+class Phase2CombinedDataset(ValerieDataset):
+    @classmethod
+    def from_raw(
+        cls, datasets=[],
+    ):
+        datasets = [Phase2Dataset.from_raw()] + [
+            dataset.from_raw() for dataset in datasets
+        ]
+        assert isinstance(datasets[0], Phase2Dataset)
+        return cls(combine_datasets_claims(datasets))
+
+
+class CombinedDataset(ValerieDataset):
+    @classmethod
+    def from_raw(
+        cls,
+        datasets=[
+            Phase2Dataset,
+            Phase1Dataset,
+            FakeNewsTop50Dataset,
+            FakeNewsKaggleDataset,
+            FakeNewsNetDataset,
+            GeorgeMcIntireDataset,
+            ISOTDataset,
+            LiarDataset,
+            MrisdalDataset,
+        ],
+    ):
+        datasets = [dataset.from_raw() for dataset in datasets]
+        return cls(combine_datasets_claims(datasets))
+
+
+def combine_datasets_claims(datasets):
+    claims_lists = [dataset.claims for dataset in datasets]
+    logging_names = [dataset.__class__.__name__ for dataset in datasets]
+    return combine_claims(claims_lists, logging_names=logging_names)
 
 
 name_to_dataset = {
@@ -515,4 +569,7 @@ name_to_dataset = {
     ISOTDataset.__name__: ISOTDataset,
     LiarDataset.__name__: LiarDataset,
     MrisdalDataset.__name__: MrisdalDataset,
+    LeadersDataset.__name__: LeadersDataset,
+    Phase2CombinedDataset.__name__: Phase2CombinedDataset,
+    CombinedDataset.__name__: CombinedDataset,
 }
