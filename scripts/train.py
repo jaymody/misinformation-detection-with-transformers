@@ -27,29 +27,9 @@ _logger = get_logger(os.path.join(base_dir, "experiment.log"))
 
 run_configs = [
     {"pretrained_model_name_or_path": "bert-base-cased"},
-    {"pretrained_model_name_or_path": "roberta-base"},
     {"pretrained_model_name_or_path": "bert-large-cased"},
+    {"pretrained_model_name_or_path": "roberta-base"},
     {"pretrained_model_name_or_path": "roberta-large"},
-    {
-        "pretrained_model_name_or_path": "xlnet-base-cased",
-        "training_args": {
-            "per_device_train_batch_size": 16,
-            "per_device_eval_batch_size": 16,
-            "warmup_steps": 100,
-            "logging_steps": 30,
-        },
-    },
-    {
-        "pretrained_model_name_or_path": "xlnet-large-cased",
-        "training_args": {
-            "per_device_train_batch_size": 8,
-            "per_device_eval_batch_size": 8,
-            "warmup_steps": 200,
-            "logging_steps": 30,
-        },
-    },
-    {"pretrained_model_name_or_path": "t5-base"},
-    {"pretrained_model_name_or_path": "t5-large"},
     {"pretrained_model_name_or_path": "albert-base-v2"},
     {"pretrained_model_name_or_path": "albert-large-v2"},
 ]
@@ -235,3 +215,4 @@ if __name__ == "__main__":
                 exist_ok=True,
                 nproc=parser_args.nproc,
             )
+    _logger.info("... done :) ...")
