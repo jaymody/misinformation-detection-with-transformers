@@ -204,7 +204,7 @@ if __name__ == "__main__":
         # execute the run
         with run:
             _logger.info(
-                "\n\n\n%s%s%s\n%s\n\n\n",
+                "\n\n\n%s\n%s\n%s\n%s\n\n\n",
                 "-" * 80,
                 run_name.center(80, "-"),
                 "-" * 80,
