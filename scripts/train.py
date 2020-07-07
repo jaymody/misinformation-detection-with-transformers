@@ -205,9 +205,9 @@ if __name__ == "__main__":
         with run:
             _logger.info(
                 "\n\n\n%s%s%s\n%s\n\n\n",
-                "-" * 64,
-                str(i) + " - " + run_name,
-                "-" * 64,
+                "-" * 80,
+                run_name.center(80, "-"),
+                "-" * 80,
                 json.dumps(run_config, indent=2),
             )
 
