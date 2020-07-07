@@ -172,7 +172,8 @@ class SequenceClassificationModel:
             compute_metrics=compute_metrics,
         )
         _global_step, _tr_loss = trainer.train(model_path=model_path)
-        trainer.save_model(training_args.output_dir)
+        if training_args.save_total_limit > 0:
+            trainer.save_model(training_args.output_dir)
         return _global_step, _tr_loss
 
     def predict(self, predict_dataset, predict_batch_size=8):
