@@ -161,7 +161,7 @@ if __name__ == "__main__":
     if parser_args.test_mode:
         os.environ["WANDB_MODE"] = "dryrun"  # don't upload experiment upload
 
-    for i, run_config in enumerate(tqdm(run_configs, desc="run")):
+    for i, run_config in enumerate(run_configs):
         # setup run config, name, wandb integration, output dir, etc ...
         run_config = construct_run_config_with_defaults(run_config)
         run_name = group_name + "-" + str(i)
