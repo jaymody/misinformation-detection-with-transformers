@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 from sklearn.model_selection import train_test_split
 
 from valerie.utils import get_logger
-from valerie.datasets import Phase2Dataset
+from valerie.datasets import Phase2Dataset, name_to_dataset
 from valerie.modeling import SequenceClassificationModel, SequenceClassificationExample
 
 
@@ -20,6 +20,8 @@ models_dir = "models"
 task_type = "fnc"
 group_name = "initial_test_run"
 base_dir = os.path.join(models_dir, task_type, group_name)
+
+tags = [task_type] + ["phase2"]
 
 # creates dir or throws an error if it already exists
 os.makedirs(base_dir)
@@ -135,7 +137,6 @@ def generate_sequence_classification_examples(claims):
 
 
 def get_claims(run_config):
-    name_to_dataset = {Phase2Dataset.__name__: Phase2Dataset}
     dataset_class = name_to_dataset[run_config["valerie_dataset"]]
     dataset = dataset_class.from_raw()
     claims = dataset.claims
@@ -171,7 +172,7 @@ if __name__ == "__main__":
         os.makedirs(output_dir)
         run = wandb.init(
             name=run_name,
-            tags=[task_type],
+            tags=tags,
             dir=output_dir,
             group=group_name,
             reinit=True,
