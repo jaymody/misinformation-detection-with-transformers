@@ -1,7 +1,24 @@
 """Utility functions."""
 import logging
 
+from tqdm.auto import tqdm
+
 _logger = logging.getLogger(__name__)
+
+
+class TqdmLoggingHandler(logging.Handler):
+    def __init__(self, level=logging.NOTSET):
+        super().__init__(level)
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            tqdm.write(msg)
+            self.flush()
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except:
+            self.handleError(record)
 
 
 def get_logger(logfile=None):
@@ -13,7 +30,7 @@ def get_logger(logfile=None):
 
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
-    logger.handlers = [sh]
+    logger.handlers = [sh, TqdmLoggingHandler()]
 
     if logfile:
         fh = logging.FileHandler(logfile)
