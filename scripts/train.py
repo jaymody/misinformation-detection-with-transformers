@@ -173,7 +173,7 @@ if __name__ == "__main__":
             dir=output_dir,
             group=group_name,
             reinit=True,
-            allow_val_change=True,
+            allow_val_change=False,
         )
 
         if parser_args.test_mode:
