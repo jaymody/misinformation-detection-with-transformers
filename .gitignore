@@ -9,6 +9,8 @@
 /run_compile
 /run_vm
 /todo.md
+/src
+/wandb
 _*.ipynb
 .envrc
 
