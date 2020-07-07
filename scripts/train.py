@@ -6,7 +6,6 @@ import argparse
 import wandb
 import numpy as np
 from tqdm.auto import tqdm
-from sklearn.model_selection import train_test_split
 
 from valerie.utils import get_logger
 from valerie.datasets import Phase2Dataset, name_to_dataset
@@ -136,21 +135,20 @@ def generate_sequence_classification_examples(claims):
     return examples
 
 
-def get_claims(run_config):
+def get_dataset(run_config):
     dataset_class = name_to_dataset[run_config["valerie_dataset"]]
     dataset = dataset_class.from_raw()
-    claims = dataset.claims
-    return claims
+    return dataset
 
 
 def get_examples(run_config):
-    claims = get_claims(run_config)
-    examples = generate_sequence_classification_examples(claims)
-
-    _labels = [example.label for example in examples]
-    train_examples, eval_examples, _, _ = train_test_split(
-        examples, _labels, stratify=_labels, **run_config["train_test_split_args"]
+    dataset = get_dataset(run_config)
+    dataset.train_test_split_subdataset(
+        Phase2Dataset.__name__, **run_config["train_test_split_args"]
     )
+
+    train_examples = generate_sequence_classification_examples(dataset.train_claims)
+    eval_examples = generate_sequence_classification_examples(dataset.test_claims)
 
     return train_examples, eval_examples
 
