@@ -19,19 +19,20 @@ _logger = logging.getLogger(__name__)
 
 
 class ValerieDataset:
-    name = "_valerie_dataset"
-
     def __init__(self, claims, articles=None):
         self.claims = list(set(claims))
         _logger.info(
-            "%s claims set change %d --> %d", self.name, len(claims), len(self.claims),
+            "%s claims set change %d --> %d",
+            self.__class__.__name__,
+            len(claims),
+            len(self.claims),
         )
 
         if articles:
             self.articles = list(set(articles))
             _logger.info(
                 "%s articles set change %d --> %d",
-                self.name,
+                self.__class__.__name__,
                 len(articles),
                 len(self.articles),
             )
@@ -41,10 +42,10 @@ class ValerieDataset:
         claims = []
         misses = 0
         for i, row in tqdm(
-            df.iterrows(), total=len(df), desc="{} to claims".format(cls.name)
+            df.iterrows(), total=len(df), desc="{} to claims".format(cls.__name__)
         ):
             # if phase1/phase2, do not try/except an error when parsing df
-            if cls.name == "phase1" or cls.name == "phase2":
+            if cls.__name__ == "phase1" or cls.__name__ == "phase2":
                 claims.append(row_to_claim(i, row))
             else:
                 try:
@@ -61,9 +62,9 @@ class ValerieDataset:
 
     @classmethod
     def from_all_filter(cls, claims, articles=None):
-        _claims = [c for c in claims if c.dataset_name == cls.name]
+        _claims = [c for c in claims if c.dataset_name == cls.__name__]
         if articles:
-            _articles = [a for a in articles if a.dataset_name == cls.name]
+            _articles = [a for a in articles if a.dataset_name == cls.__name__]
         return cls(_claims, _articles)
 
 
@@ -73,8 +74,6 @@ class ValerieDataset:
 
 
 class Phase1Dataset(ValerieDataset):
-    name = "phase1"
-
     @classmethod
     def from_raw(
         cls, metadata_file="data/phase1/raw/metadata.json", articles_dir=None, nproc=1
@@ -108,11 +107,11 @@ class Phase1Dataset(ValerieDataset):
         related_articles = {}
         if "related_articles" in row:
             for rel_art in row.pop("related_articles"):
-                rel_art = cls.name + "/" + str(rel_art) + ".txt"
+                rel_art = cls.__name__ + "/" + str(rel_art) + ".txt"
                 related_articles[rel_art] = rel_art
 
         return Claim(
-            _id, related_articles=related_articles, dataset_name=cls.name, **row
+            _id, related_articles=related_articles, dataset_name=cls.__name__, **row
         )
 
     @staticmethod
@@ -134,13 +133,13 @@ class Phase1Dataset(ValerieDataset):
 def _articles_from_phase1_visit(fpath):
     with open(fpath, encoding="utf8") as fi:
         art_id = os.path.basename(fpath)
-        article = Article.from_txt(art_id, fi.read(), dataset_name=Phase1Dataset.name)
+        article = Article.from_txt(
+            art_id, fi.read(), dataset_name=Phase1Dataset.__name__
+        )
     return article
 
 
 class Phase2Dataset(ValerieDataset):
-    name = "phase2"
-
     @classmethod
     def from_raw(
         cls, metadata_file="data/phase2-1/raw/metadata.json", articles_dir=None, nproc=1
@@ -174,11 +173,11 @@ class Phase2Dataset(ValerieDataset):
         related_articles = {}
         if "related_articles" in row:
             for k, v in row.pop("related_articles").items():
-                rel_art = cls.name + "/" + os.path.basename(k)
+                rel_art = cls.__name__ + "/" + os.path.basename(k)
                 related_articles[rel_art] = v
 
         return Claim(
-            _id, related_articles=related_articles, dataset_name=cls.name, **row
+            _id, related_articles=related_articles, dataset_name=cls.__name__, **row
         )
 
     @staticmethod
@@ -215,7 +214,9 @@ class Phase2Dataset(ValerieDataset):
 def _articles_from_phase2_visit(fpath):
     with open(fpath, encoding="utf8") as fi:
         art_id = os.path.basename(fpath)
-        article = Article.from_html(art_id, fi.read(), dataset_name=Phase2Dataset.name)
+        article = Article.from_html(
+            art_id, fi.read(), dataset_name=Phase2Dataset.__name__
+        )
     return article
 
 
@@ -226,8 +227,6 @@ def _articles_from_phase2_visit(fpath):
 
 class FakeNewsTop50Dataset(ValerieDataset):
     """https://github.com/BuzzFeedNews/2018-12-fake-news-top-50.git"""
-
-    name = "fake_news_top50"
 
     @classmethod
     def from_raw(
@@ -257,19 +256,17 @@ class FakeNewsTop50Dataset(ValerieDataset):
         # TODO: consider lowercasing the input claim (all words
         # start with capital currently)
         return Claim(
-            cls.name + "/" + str(i),
+            cls.__name__ + "/" + str(i),
             claim=row["title"],
             date=row["published_date"],
             claimant="Facebook user",
             label=0,
-            dataset_name=cls.name,
+            dataset_name=cls.__name__,
         )
 
 
 class FakeNewsKaggleDataset(ValerieDataset):
     """https://www.kaggle.com/c/fake-news/"""
-
-    name = "fake_news_kaggle"
 
     @classmethod
     def from_raw(cls, train_csv="data/external/fake-news/train.csv"):
@@ -283,18 +280,16 @@ class FakeNewsKaggleDataset(ValerieDataset):
         # label 0 for reliable
         # label 1 for unreliable
         return Claim(
-            cls.name + "/" + str(i),
+            cls.__name__ + "/" + str(i),
             claim=row["title"],
             claimant=row["author"],
             label=0 if row["label"] else 2,
-            dataset_name=cls.name,
+            dataset_name=cls.__name__,
         )
 
 
 class FakeNewsNetDataset(ValerieDataset):
     """https://github.com/KaiDMML/FakeNewsNet.git"""
-
-    name = "fake_news_net"
 
     @classmethod
     def from_raw(
@@ -322,18 +317,16 @@ class FakeNewsNetDataset(ValerieDataset):
     @classmethod
     def row_to_claim(cls, i, row):
         return Claim(
-            cls.name + "/" + str(i),
+            cls.__name__ + "/" + str(i),
             claim=row["title"],
             claimant=tldextract.extract(row["news_url"]).domain,
             label=row["label"],
-            dataset_name=cls.name,
+            dataset_name=cls.__name__,
         )
 
 
 class GeorgeMcIntireDataset(ValerieDataset):
     """https://github.com/GeorgeMcIntire"""
-
-    name = "george_mcintire"
 
     @classmethod
     def from_raw(cls, data_csv="data/external/george-mcintire/fake_or_real_news.csv"):
@@ -345,17 +338,15 @@ class GeorgeMcIntireDataset(ValerieDataset):
     @classmethod
     def row_to_claim(cls, i, row):
         return Claim(
-            cls.name + "/" + str(i),
+            cls.__name__ + "/" + str(i),
             claim=row["title"],
             label=0 if row["label"] == "FAKE" else 1,
-            dataset_name=cls.name,
+            dataset_name=cls.__name__,
         )
 
 
 class ISOTDataset(ValerieDataset):
     """https://www.uvic.ca/engineering/ece/isot/datasets/"""
-
-    name = "isot"
 
     @classmethod
     def from_raw(
@@ -388,18 +379,16 @@ class ISOTDataset(ValerieDataset):
                     _date = None
 
         return Claim(
-            cls.name + "/" + str(i),
+            cls.__name__ + "/" + str(i),
             claim=row["title"],
             date=_date.strftime("%Y-%m-%d") if _date else None,
             label=row["label"],
-            dataset_name=cls.name,
+            dataset_name=cls.__name__,
         )
 
 
 class LiarDataset(ValerieDataset):
     """https://www.cs.ucsb.edu/~william/data/liar_dataset.zip"""
-
-    name = "liar"
 
     @classmethod
     def from_raw(cls, data_tsv="data/external/liar/train.tsv"):
@@ -438,18 +427,16 @@ class LiarDataset(ValerieDataset):
             _lab = 1
 
         return Claim(
-            cls.name + "/" + str(i),
+            cls.__name__ + "/" + str(i),
             claim=row["statement"],
             claimant=row["speaker"] if isinstance(row["speaker"], str) else None,
             label=_lab,
-            dataset_name=cls.name,
+            dataset_name=cls.__name__,
         )
 
 
 class MrisdalDataset(ValerieDataset):
     """https://www.kaggle.com/mrisdal/fake-news"""
-
-    name = "mrisdal"
 
     @classmethod
     def from_raw(cls, data_csv="data/external/mrisdal/fake.csv"):
@@ -463,14 +450,14 @@ class MrisdalDataset(ValerieDataset):
         if row["ord_in_thread"] != 0:
             raise ValueError("must be main post")
         return Claim(
-            cls.name + "/" + str(i),
+            cls.__name__ + "/" + str(i),
             claim=row["title"],
             claimant=row["site_url"],
             date=datetime.datetime.strptime(
                 row["published"].split("T")[0], "%Y-%m-%d"
             ).strftime("%Y-%m-%d"),
             label=0,
-            dataset_name=cls.name,
+            dataset_name=cls.__name__,
         )
 
 
@@ -480,8 +467,6 @@ class MrisdalDataset(ValerieDataset):
 
 
 class CombinedDataset(ValerieDataset):
-    name = "combined"
-
     @classmethod
     def from_raw(cls):
         datasets = [
@@ -510,7 +495,7 @@ class CombinedDataset(ValerieDataset):
             combined_claims_set = combined_claims_set | set(dataset.claims)
             _logger.info(
                 "%s: %d --> %d (+ %d = %d - %d)",
-                dataset.name,
+                dataset.__class__.__name__,
                 prev_len,
                 len(combined_claims_set),
                 len(combined_claims_set) - prev_len,
@@ -518,3 +503,18 @@ class CombinedDataset(ValerieDataset):
                 prev_len + len(dataset.claims) - len(combined_claims_set),
             )
         return cls(list(combined_claims_set))
+
+
+name_to_dataset = {
+    ValerieDataset.__name__: ValerieDataset,
+    Phase1Dataset.__name__: Phase1Dataset,
+    Phase2Dataset.__name__: Phase2Dataset,
+    FakeNewsTop50Dataset.__name__: FakeNewsTop50Dataset,
+    FakeNewsKaggleDataset.__name__: FakeNewsKaggleDataset,
+    FakeNewsNetDataset.__name__: FakeNewsNetDataset,
+    GeorgeMcIntireDataset.__name__: GeorgeMcIntireDataset,
+    ISOTDataset.__name__: ISOTDataset,
+    LiarDataset.__name__: LiarDataset,
+    MrisdalDataset.__name__: MrisdalDataset,
+    CombinedDataset.__name__: CombinedDataset,
+}
