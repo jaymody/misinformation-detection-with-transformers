@@ -294,10 +294,10 @@ class FakeNewsNetDataset(ValerieDataset):
     @classmethod
     def from_raw(
         cls,
-        politifact_fake_csv="data/external/FakeNewsNet/dataset/politifact_fake.cs",
-        politifact_real_csv="data/external/FakeNewsNet/dataset/politifact_real.cs",
-        gossipcop_fake_csv="data/external/FakeNewsNet/dataset/gossipcop_fake.cs",
-        gossipcop_real_csv="data/external/FakeNewsNet/dataset/gossipcop_real.cs",
+        politifact_fake_csv="data/external/FakeNewsNet/dataset/politifact_fake.csv",
+        politifact_real_csv="data/external/FakeNewsNet/dataset/politifact_real.csv",
+        gossipcop_fake_csv="data/external/FakeNewsNet/dataset/gossipcop_fake.csv",
+        gossipcop_real_csv="data/external/FakeNewsNet/dataset/gossipcop_real.csv",
         name="fake_news_net",
     ):
         df = pd.concat(
@@ -506,7 +506,6 @@ class CombinedDataset(ValerieDataset):
 
 
 name_to_dataset = {
-    ValerieDataset.__name__: ValerieDataset,
     Phase1Dataset.__name__: Phase1Dataset,
     Phase2Dataset.__name__: Phase2Dataset,
     FakeNewsTop50Dataset.__name__: FakeNewsTop50Dataset,
@@ -516,5 +515,4 @@ name_to_dataset = {
     ISOTDataset.__name__: ISOTDataset,
     LiarDataset.__name__: LiarDataset,
     MrisdalDataset.__name__: MrisdalDataset,
-    CombinedDataset.__name__: CombinedDataset,
 }
