@@ -256,7 +256,7 @@ class FakeNewsTop50Dataset(ValerieDataset):
         # TODO: consider lowercasing the input claim (all words
         # start with capital currently)
         return Claim(
-            cls.__name__ + "/" + str(i),
+            str(i),
             claim=row["title"],
             date=row["published_date"],
             claimant="Facebook user",
@@ -280,7 +280,7 @@ class FakeNewsKaggleDataset(ValerieDataset):
         # label 0 for reliable
         # label 1 for unreliable
         return Claim(
-            cls.__name__ + "/" + str(i),
+            str(i),
             claim=row["title"],
             claimant=row["author"],
             label=0 if row["label"] else 2,
@@ -317,7 +317,7 @@ class FakeNewsNetDataset(ValerieDataset):
     @classmethod
     def row_to_claim(cls, i, row):
         return Claim(
-            cls.__name__ + "/" + str(i),
+            str(i),
             claim=row["title"],
             claimant=tldextract.extract(row["news_url"]).domain,
             label=row["label"],
@@ -338,7 +338,7 @@ class GeorgeMcIntireDataset(ValerieDataset):
     @classmethod
     def row_to_claim(cls, i, row):
         return Claim(
-            cls.__name__ + "/" + str(i),
+            str(i),
             claim=row["title"],
             label=0 if row["label"] == "FAKE" else 1,
             dataset_name=cls.__name__,
@@ -379,7 +379,7 @@ class ISOTDataset(ValerieDataset):
                     _date = None
 
         return Claim(
-            cls.__name__ + "/" + str(i),
+            str(i),
             claim=row["title"],
             date=_date.strftime("%Y-%m-%d") if _date else None,
             label=row["label"],
@@ -427,7 +427,7 @@ class LiarDataset(ValerieDataset):
             _lab = 1
 
         return Claim(
-            cls.__name__ + "/" + str(i),
+            str(i),
             claim=row["statement"],
             claimant=row["speaker"] if isinstance(row["speaker"], str) else None,
             label=_lab,
@@ -450,7 +450,7 @@ class MrisdalDataset(ValerieDataset):
         if row["ord_in_thread"] != 0:
             raise ValueError("must be main post")
         return Claim(
-            cls.__name__ + "/" + str(i),
+            str(i),
             claim=row["title"],
             claimant=row["site_url"],
             date=datetime.datetime.strptime(
