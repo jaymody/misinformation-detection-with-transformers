@@ -193,7 +193,9 @@ if __name__ == "__main__":
 
             train_examples, eval_examples = get_examples(run_config)
 
-            wandb.config.update(run_config)
+            wandb.config.update(
+                {k: v for k, v in run_config.items() if k not in ["training_args"]}
+            )
             wandb.config.update(
                 {
                     "num_train_examples": len(train_examples),
