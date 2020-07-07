@@ -1,7 +1,7 @@
 """Utility functions."""
 import logging
 
-from tqdm.auto import tqdm
+import tqdm
 
 _logger = logging.getLogger(__name__)
 
@@ -13,7 +13,7 @@ class TqdmLoggingHandler(logging.Handler):
     def emit(self, record):
         try:
             msg = self.format(record)
-            tqdm.write(msg)
+            tqdm.tqdm.write(msg)
             self.flush()
         except (KeyboardInterrupt, SystemExit):
             raise
