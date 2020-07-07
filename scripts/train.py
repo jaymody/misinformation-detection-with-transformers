@@ -131,12 +131,12 @@ def construct_run_config_with_defaults(run_config):
     new_cfg["valerie_dataset"] = default_valerie_dataset()
 
     # update new_cfg with new values (shallow)
-    for topic in run_config:
+    for topic, topic_values in run_config.items():
         if topic in new_cfg:
-            for k, v in topic.items():
+            for k, v in topic_values.items():
                 new_cfg[topic][k] = v
         else:
-            new_cfg[topic] = run_config[topic]
+            new_cfg[topic] = topic_values
 
     return new_cfg
 
