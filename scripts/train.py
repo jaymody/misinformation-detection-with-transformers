@@ -36,7 +36,6 @@ run_configs = [
 ]
 
 
-# maybe put all the defaults in valerie utils?
 def default_training_args(is_large=False):
     if is_large:
         return {
