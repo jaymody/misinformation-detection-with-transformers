@@ -1,5 +1,6 @@
 import os
 import glob
+import json
 import logging
 import datetime
 import multiprocessing
@@ -88,7 +89,11 @@ class ValerieDataset:
             df.iterrows(), total=len(df), desc="{} to claims".format(cls.__name__)
         ):
             # if phase1/phase2, do not try/except an error when parsing df
-            if cls.__name__ == "phase1" or cls.__name__ == "phase2":
+            if cls.__name__ in [
+                Phase1Dataset.__name__,
+                Phase1Dataset.__name__,
+                Phase2TrialDataset.__name__,
+            ]:
                 claims.append(row_to_claim(i, row))
             else:
                 try:
@@ -261,6 +266,54 @@ def _articles_from_phase2_visit(fpath):
             art_id, fi.read(), dataset_name=Phase2Dataset.__name__
         )
     return article
+
+
+class Phase2TrialDataset(ValerieDataset):
+    @classmethod
+    def from_raw(
+        cls,
+        unlabelled_metadata_file="data/phase2-trial/raw/2_trial_metadata.json",
+        labels_file="data/phase2-trial/raw/2_trial_labels.json",
+    ):
+        with open(unlabelled_metadata_file) as fi:
+            trial_metadata_unlabelled = json.load(fi)
+        with open(labels_file) as fi:
+            trial_labels = json.load(fi)
+
+        trial_metadata = [
+            {
+                **claim,
+                "label": trial_labels[str(claim["id"])]["label"],
+                "related_articles": trial_labels[str(claim["id"])]["related_articles"],
+            }
+            for claim in trial_metadata_unlabelled
+        ]
+
+        df = pd.DataFrame(trial_metadata)
+        claims = cls.df_to_claims(df, cls.row_to_claim)
+
+        return cls(claims)
+
+    @classmethod
+    def row_to_claim(cls, i, row):
+        # THIS SHOULD BE KEPT UP TO DATE WITH THE row_to_claim FUNCTION
+        # OF Phase2Dataset. For now, there are two copies of this function,
+        # in the future I'll find a smarter way to do this
+
+        row = dict(row)
+        _id = row.pop("id")
+
+        # only parse related articles if it exists
+        # (we do this check since related_articles is a removed field for the eval)
+        related_articles = {}
+        if "related_articles" in row:
+            for k, v in row.pop("related_articles").items():
+                rel_art = cls.__name__ + "/" + os.path.basename(k)
+                related_articles[rel_art] = v
+
+        return Claim(
+            _id, related_articles=related_articles, dataset_name=cls.__name__, **row
+        )
 
 
 ####################
@@ -562,6 +615,7 @@ def combine_datasets_claims(datasets):
 name_to_dataset = {
     Phase1Dataset.__name__: Phase1Dataset,
     Phase2Dataset.__name__: Phase2Dataset,
+    Phase2TrialDataset.__name__: Phase2TrialDataset,
     FakeNewsTop50Dataset.__name__: FakeNewsTop50Dataset,
     FakeNewsKaggleDataset.__name__: FakeNewsKaggleDataset,
     FakeNewsNetDataset.__name__: FakeNewsNetDataset,
