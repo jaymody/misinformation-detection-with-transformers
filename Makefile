@@ -19,9 +19,8 @@ test:
 	bash run_tests 2>&1 | tee logs/tests/test.log
 
 fetch:
-	mkdir -p data/phase2-trial/raw
-	gsutil cp -r gs://valerie-bucket/data/phase2-trial/raw data/phase2-trial/raw
-	# python phase2_trial_data.py --trial_data_raw_dir data/phase2-trial/raw --output_dir data/phase2-trial
+	mkdir -p data/phase2-trial
+	gsutil cp -r gs://valerie-bucket/data/phase2-trial/raw data/phase2-trial
 
 	gsutil cp gs://valerie-bucket/data/phase1/raw/metadata.json data/phase1/raw/metadata.json
 	gsutil cp gs://valerie-bucket/data/phase2-1/raw/metadata.json data/phase2-1/raw/metadata.json
