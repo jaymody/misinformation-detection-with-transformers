@@ -34,13 +34,8 @@ run_test() {
         --metadata_file ${METADATA_FILE_LABELLED} \
         --predictions_file ${PREDICTIONS_FILE} \
         --score_file ${SCORE_FILE} \
-        --report_file ${REPORT_FILE}
-
-    echo "score:"
-    cat ${SCORE_FILE}
-    echo ""
-    echo "report:"
-    cat ${REPORT_FILE}
+        --report_file ${REPORT_FILE} \
+        --print true
 }
 
 
