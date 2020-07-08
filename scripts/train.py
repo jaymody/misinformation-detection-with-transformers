@@ -97,10 +97,6 @@ def default_train_test_split_args():
     return {"train_size": 0.8, "random_state": 42}
 
 
-def default_valerie_dataset():
-    return Phase2Dataset.__name__
-
-
 def construct_run_config_with_defaults(run_config):
     new_cfg = {}
     new_cfg["training_args"] = default_training_args(
@@ -110,7 +106,6 @@ def construct_run_config_with_defaults(run_config):
     new_cfg["tokenizer_args"] = default_tokenizer_args()
     new_cfg["model_args"] = default_model_args()
     new_cfg["train_test_split_args"] = default_train_test_split_args()
-    new_cfg["valerie_dataset"] = default_valerie_dataset()
 
     # update new_cfg with new values (shallow)
     for topic, topic_values in run_config.items():
