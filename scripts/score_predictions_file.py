@@ -6,14 +6,14 @@ from valerie.scoring import validate_predictions_phase2, compute_detailed_score_
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--metadata_file", type=str)
+    parser.add_argument("--metadata_labelled_file", type=str)
     parser.add_argument("--predictions_file", type=str)
     parser.add_argument("--score_file", type=str, default=None)
     parser.add_argument("--report_file", type=str, default=None)
     parser.add_argument("--print", type=bool, default=True)
     args = parser.parse_args()
 
-    with open(args.metadata_file) as fi:
+    with open(args.metadata_labelled_file) as fi:
         labels = json.load(fi)
     with open(args.predictions_file) as fi:
         predictions = json.load(fi)

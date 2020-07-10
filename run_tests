@@ -31,7 +31,7 @@ run_test() {
         --nproc 4
 
     python scripts/score_predictions_file.py \
-        --metadata_file ${METADATA_FILE_LABELLED} \
+        --metadata_labelled_file ${METADATA_FILE_LABELLED} \
         --predictions_file ${PREDICTIONS_FILE} \
         --score_file ${SCORE_FILE} \
         --report_file ${REPORT_FILE} \
