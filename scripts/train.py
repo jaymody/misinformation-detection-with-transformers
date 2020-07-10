@@ -8,7 +8,7 @@ import numpy as np
 from tqdm.auto import tqdm
 
 from valerie.utils import get_logger
-from valerie.datasets import Phase2Dataset, name_to_dataset
+from valerie.datasets import Phase2Dataset, Phase2ValidationDataset, name_to_dataset
 from valerie.modeling import SequenceClassificationModel, SequenceClassificationExample
 
 
@@ -20,19 +20,17 @@ task_type = "fnc"
 group_name = "initial_test_run"
 base_dir = os.path.join(models_dir, task_type, group_name)
 
-tags = [task_type] + ["phase2"]
+tags = [task_type] + ["phase2", "validation"]
 
 # creates dir or throws an error if it already exists
 os.makedirs(base_dir)
 _logger = get_logger(os.path.join(base_dir, "experiment.log"))
 
 run_configs = [
-    {"pretrained_model_name_or_path": "bert-base-cased"},
-    {"pretrained_model_name_or_path": "bert-large-cased"},
-    {"pretrained_model_name_or_path": "roberta-base"},
-    {"pretrained_model_name_or_path": "roberta-large"},
-    {"pretrained_model_name_or_path": "albert-base-v2"},
-    {"pretrained_model_name_or_path": "albert-large-v2"},
+    {
+        "pretrained_model_name_or_path": "roberta-large",
+        "valerie_dataset": Phase2Dataset.__name__,
+    },
 ]
 
 
@@ -94,7 +92,7 @@ def default_model_args():
 
 
 def default_train_test_split_args():
-    return {"train_size": 0.8, "random_state": 42}
+    return {"train_size": 0.95, "random_state": 42}
 
 
 def construct_run_config_with_defaults(run_config):
@@ -105,7 +103,7 @@ def construct_run_config_with_defaults(run_config):
     new_cfg["config_args"] = default_config_args()
     new_cfg["tokenizer_args"] = default_tokenizer_args()
     new_cfg["model_args"] = default_model_args()
-    new_cfg["train_test_split_args"] = default_train_test_split_args()
+    # new_cfg["train_test_split_args"] = default_train_test_split_args()
 
     # update new_cfg with new values (shallow)
     for topic, topic_values in run_config.items():
@@ -123,7 +121,12 @@ def generate_sequence_classification_examples(claims):
     for claim in tqdm(claims, desc="generating examples"):
         examples.append(
             SequenceClassificationExample(
-                guid=claim.id, text_a=claim.claim, text_b=None, label=claim.label,
+                guid=claim.id,
+                text_a=claim.claim,
+                text_b=(claim.claimant if claim.claimant else "no claimant")
+                + " "
+                + (claim.date.split()[0] if claim.date else "no date"),
+                label=claim.label,
             )
         )
     return examples
@@ -136,13 +139,11 @@ def get_dataset(run_config):
 
 
 def get_examples(run_config):
-    dataset = get_dataset(run_config)
-    dataset.train_test_split_subdataset(
-        Phase2Dataset.__name__, **run_config["train_test_split_args"]
-    )
+    train_dataset = get_dataset(run_config)
+    eval_dataset = Phase2ValidationDataset.from_raw()
 
-    train_examples = generate_sequence_classification_examples(dataset.train_claims)
-    eval_examples = generate_sequence_classification_examples(dataset.test_claims)
+    train_examples = generate_sequence_classification_examples(train_dataset.claims)
+    eval_examples = generate_sequence_classification_examples(eval_dataset.claims)
 
     return train_examples, eval_examples
 
