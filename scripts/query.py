@@ -8,7 +8,7 @@ from tqdm.auto import tqdm
 
 from valerie import search
 from valerie.data import Article
-from valerie.datasets import Phase2Dataset
+from valerie.datasets import name_to_dataset
 from valerie.utils import get_logger
 from valerie.scoring import validate_predictions_phase2, compute_score_phase2
 from valerie.preprocessing import clean_text
@@ -120,11 +120,12 @@ def pipeline(claim):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_file", type=str)
-    parser.add_argument("--metadata_file", type=str)
+    parser.add_argument("--dataset_name", type=str)
     parser.add_argument("--nproc", type=int, default=4)
     args = parser.parse_args()
 
-    claims = Phase2Dataset.from_raw(args.metadata_file).claims
+    dataset_class = name_to_dataset[args.dataset_name]
+    claims = dataset_class.from_raw().claims
 
     pool = multiprocessing.Pool(args.nproc)
     responses = []
