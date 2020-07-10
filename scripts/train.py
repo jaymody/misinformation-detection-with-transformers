@@ -1,14 +1,24 @@
 import os
+import gc
 import copy
 import json
 import argparse
+from multiprocessing import Process
 
+import torch
 import wandb
 import numpy as np
 from tqdm.auto import tqdm
 
 from valerie.utils import get_logger
-from valerie.datasets import Phase2Dataset, Phase2ValidationDataset, name_to_dataset
+from valerie.datasets import (
+    Phase1Dataset,
+    Phase2Dataset,
+    LeadersDataset,
+    CombinedDataset,
+    Phase2ValidationDataset,
+    name_to_dataset,
+)
 from valerie.modeling import SequenceClassificationModel, SequenceClassificationExample
 
 
@@ -17,7 +27,7 @@ os.environ["WANDB_PROJECT"] = "valerie"  # project
 
 models_dir = "models"
 task_type = "fnc"
-group_name = "initial_test_run"
+group_name = "post_datafix_initial"
 base_dir = os.path.join(models_dir, task_type, group_name)
 
 tags = [task_type] + ["phase2", "validation"]
@@ -91,8 +101,34 @@ name_to_ge = {
 run_configs = [
     {
         "pretrained_model_name_or_path": "roberta-large",
+        "valerie_dataset": Phase1Dataset.__name__,
+        "generate_examples_function": ge_claimant_date.__name__,
+    },
+    {
+        "pretrained_model_name_or_path": "roberta-large",
         "valerie_dataset": Phase2Dataset.__name__,
         "generate_examples_function": ge_claimant_date.__name__,
+    },
+    {
+        "pretrained_model_name_or_path": "roberta-large",
+        "valerie_dataset": LeadersDataset.__name__,
+        "generate_examples_function": ge_claimant.__name__,
+    },
+    {
+        "pretrained_model_name_or_path": "roberta-large",
+        "valerie_dataset": LeadersDataset.__name__,
+        "generate_examples_function": ge_claimant_date.__name__,
+    },
+    {
+        "pretrained_model_name_or_path": "roberta-large",
+        "valerie_dataset": CombinedDataset.__name__,
+        "generate_examples_function": ge_claimant_date.__name__,
+        "training_args": {
+            "save_steps": 2000,
+            "save_total_limit": 4,
+            "num_train_epochs": 8,
+            "warmup_steps": 250,
+        },
     },
 ]
 
@@ -201,6 +237,62 @@ def get_examples(run_config):
     return train_examples, eval_examples
 
 
+def run(run_config, run_name, test_mode=False, nproc=1):
+    # setup run config, wandb integration, output dir, etc ...
+    run_config = construct_run_config_with_defaults(run_config)
+    output_dir = os.path.join(base_dir, run_name)
+    os.makedirs(output_dir)
+    run = wandb.init(
+        name=run_name,
+        tags=tags,
+        dir=output_dir,
+        group=group_name,
+        reinit=True,
+        allow_val_change=False,
+    )
+
+    if test_mode:
+        run_config["training_args"]["max_steps"] = 8
+        run_config["training_args"]["warmup_steps"] = 2
+        run_config["training_args"]["logging_steps"] = 4
+        run_config["training_args"]["eval_steps"] = 4
+
+    # execute the run
+    with run:
+        _logger.info(
+            "\n\n\n%s\n%s\n%s\n%s\n\n\n",
+            "-" * 80,
+            run_name.center(80, "-"),
+            "-" * 80,
+            json.dumps(run_config, indent=2),
+        )
+
+        train_examples, eval_examples = get_examples(run_config)
+
+        wandb.config.update(
+            {k: v for k, v in run_config.items() if k not in ["training_args"]}
+        )
+        wandb.config.update(
+            {
+                "num_train_examples": len(train_examples),
+                "num_eval_examples": len(eval_examples),
+            }
+        )
+
+        SequenceClassificationModel.train_from_pretrained(
+            output_dir=output_dir,
+            pretrained_model_name_or_path=run_config["pretrained_model_name_or_path"],
+            train_examples=train_examples,
+            eval_examples=eval_examples,
+            training_args=run_config["training_args"],
+            config_args=run_config["config_args"],
+            tokenizer_args=run_config["tokenizer_args"],
+            model_args=run_config["model_args"],
+            exist_ok=True,
+            nproc=parser_args.nproc,
+        )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--nproc", type=int, default=1)
@@ -211,60 +303,14 @@ if __name__ == "__main__":
         os.environ["WANDB_MODE"] = "dryrun"  # don't upload experiment upload
 
     for i, run_config in enumerate(run_configs):
-        # setup run config, name, wandb integration, output dir, etc ...
-        run_config = construct_run_config_with_defaults(run_config)
         run_name = group_name + "-" + str(i)
-        output_dir = os.path.join(base_dir, run_name)
-        os.makedirs(output_dir)
-        run = wandb.init(
-            name=run_name,
-            tags=tags,
-            dir=output_dir,
-            group=group_name,
-            reinit=True,
-            allow_val_change=False,
+        p = Process(
+            target=run,
+            args=(run_config, run_name, parser_args.test_mode, parser_args.nproc),
         )
+        p.start()
+        p.join()
+        gc.collect()
+        torch.cuda.empty_cache()
 
-        if parser_args.test_mode:
-            run_config["training_args"]["max_steps"] = 8
-            run_config["training_args"]["warmup_steps"] = 2
-            run_config["training_args"]["logging_steps"] = 4
-            run_config["training_args"]["eval_steps"] = 4
-
-        # execute the run
-        with run:
-            _logger.info(
-                "\n\n\n%s\n%s\n%s\n%s\n\n\n",
-                "-" * 80,
-                run_name.center(80, "-"),
-                "-" * 80,
-                json.dumps(run_config, indent=2),
-            )
-
-            train_examples, eval_examples = get_examples(run_config)
-
-            wandb.config.update(
-                {k: v for k, v in run_config.items() if k not in ["training_args"]}
-            )
-            wandb.config.update(
-                {
-                    "num_train_examples": len(train_examples),
-                    "num_eval_examples": len(eval_examples),
-                }
-            )
-
-            SequenceClassificationModel.train_from_pretrained(
-                output_dir=output_dir,
-                pretrained_model_name_or_path=run_config[
-                    "pretrained_model_name_or_path"
-                ],
-                train_examples=train_examples,
-                eval_examples=eval_examples,
-                training_args=run_config["training_args"],
-                config_args=run_config["config_args"],
-                tokenizer_args=run_config["tokenizer_args"],
-                model_args=run_config["model_args"],
-                exist_ok=True,
-                nproc=parser_args.nproc,
-            )
     _logger.info("... done :) ...")
