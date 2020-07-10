@@ -18,8 +18,7 @@ if __name__ == "__main__":
     with open(args.predictions_file) as fi:
         predictions = json.load(fi)
 
-    if not validate_predictions_phase2(predictions)[1]:
-        raise ValueError("validate_predictions_phase2 failed")
+    validate_predictions_phase2(predictions)
     report, output, official_output = compute_detailed_score_phase2(labels, predictions)
 
     if args.print:
