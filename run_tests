@@ -2,7 +2,7 @@
 
 # params
 ENVRC_FILE=".envrc"
-METADATA_FILE="data/phase2-1/raw/metadata.json"
+METADATA_FILE="data/phase2-3/raw/metadata.json"
 CLAIMANT_MODEL_FILE="models/claimant_model.json"
 PRETRAINED_MODEL_NAME_OR_PATH="models/phase2/single-claim-claimant/bert-base-cased-128-0"
 

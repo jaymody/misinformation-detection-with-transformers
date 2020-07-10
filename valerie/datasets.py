@@ -190,7 +190,7 @@ def _articles_from_phase1_visit(fpath):
 class Phase2Dataset(ValerieDataset):
     @classmethod
     def from_raw(
-        cls, metadata_file="data/phase2-1/raw/metadata.json", articles_dir=None, nproc=1
+        cls, metadata_file="data/phase2-3/raw/metadata.json", articles_dir=None, nproc=1
     ):
         # because pandas logging sucks
         if not os.path.isfile(metadata_file):
