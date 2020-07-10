@@ -32,7 +32,7 @@ def ge_claimant_date(claims):
     for claim in tqdm(claims, desc="generating examples"):
         text_b = claim.claimant if claim.claimant else "no claimant"
         text_b += " "
-        text_b += claim.date.split()[0] if claim.date else "no date"
+        text_b += claim.date.split()[0].split("T")[0] if claim.date else "no date"
         examples.append(
             SequenceClassificationExample(
                 guid=claim.id, text_a=claim.claim, text_b=text_b, label=claim.label,
@@ -48,7 +48,7 @@ def ge_date(claims):
             SequenceClassificationExample(
                 guid=claim.id,
                 text_a=claim.claim,
-                text_b=claim.date.split()[0] if claim.date else "no date",
+                text_b=claim.date.split()[0].split("T")[0] if claim.date else "no date",
                 label=claim.label,
             )
         )
