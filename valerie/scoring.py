@@ -1,6 +1,7 @@
 """Official and modified scoring functions."""
 import copy
 import json
+import collections
 
 import numpy as np
 
@@ -19,23 +20,16 @@ def validate_predictions_phase2(predictions):
 
 
 def compute_score_phase2(labels, predictions):
-    """Adapted for new submission format."""
-    _predictions = copy.deepcopy(predictions)
-    for pred in _predictions.values():
-        pred["related_articles"] = list(pred["related_articles"].values())
-    return _compute_score_phase2(labels, _predictions)
-
-
-def _compute_score_phase2(labels, predictions):
     """
     predictions and labels are a dict
     check for duplicate relevant articles
     """
+    n_class = collections.Counter([labels[o]["label"] for o in labels])
     scores = {"0": [], "1": [], "2": []}
     preds = []
     explanations = []
     if len(predictions) != len(labels):
-        print("prediction missing for some claims")
+        raise ValueError("prediction missing for some claims")
     # loop over predictions as the normalizing factor is n_class (# labels predicted)
     for claim_id in predictions:
         if len(predictions[claim_id]["explanation"]) > 1000:
@@ -49,9 +43,9 @@ def _compute_score_phase2(labels, predictions):
         preds.append(str(pred))
         label = labels[claim_id]["label"]
         if pred != label:
-            scores[str(pred)].append(0)
+            scores[str(label)].append(0)
             continue
-        rel_articles = predictions[claim_id]["related_articles"]
+        rel_articles = list(predictions[claim_id]["related_articles"].values())
         if len(rel_articles) > 2:
             return {
                 "score": 0.0,
@@ -62,14 +56,16 @@ def _compute_score_phase2(labels, predictions):
         # remove any duplicate url links
         rel_articles = set(rel_articles)
         gt_rel_articles = list(labels[claim_id]["related_articles"].values())
-        scores[str(pred)].append(sum([int(a in gt_rel_articles) for a in rel_articles]))
-        explanations.append(predictions[claim_id]["explanation"])
+        scores[str(label)].append(
+            sum([int(a in gt_rel_articles) for a in rel_articles])
+        )
+        explanations.append(predictions[claim_id]["explanation"].replace("'", ""))
 
     for l in scores:
-        if not scores[l]:
+        if not scores[l]:  # if scores[l] is [], np.mean returns a NaN
             scores[l] = 0.0
         else:
-            scores[l] = np.mean(scores[l])
+            scores[l] = sum(scores[l]) / n_class[int(l)]
 
     return {
         "score": np.mean(list(scores.values())),

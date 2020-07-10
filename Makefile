@@ -24,12 +24,12 @@ fetch:
 
 	gsutil cp gs://valerie-bucket/data/phase1/raw/metadata.json data/phase1/raw/metadata.json
 	gsutil cp gs://valerie-bucket/data/phase2-1/raw/metadata.json data/phase2-1/raw/metadata.json
-	gsutil cp gs://valerie-bucket/data/phase2-3/raw/metadata.json data/phase2-1/raw/metadata.json
+	gsutil cp gs://valerie-bucket/data/phase2-3/raw/metadata.json data/phase2-3/raw/metadata.json
 
 fetch_zips:
 	gsutil cp gs://valerie-bucket/data/phase1/train.zip data/phase1/train.zip
 	gsutil cp gs://valerie-bucket/data/phase2-1/train.zip data/phase2-1/train.zip
-	gsutil cp gs://valerie-bucket/data/phase2-3/train.zip data/phase2-1/train.zip
+	gsutil cp gs://valerie-bucket/data/phase2-3/train.zip data/phase2-3/train.zip
 
 unzip_zips:
 	rm -rf data/phase1/raw
