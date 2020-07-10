@@ -30,6 +30,7 @@ run_configs = [
     {
         "pretrained_model_name_or_path": "roberta-large",
         "valerie_dataset": Phase2Dataset.__name__,
+        "generate_examples_function": ge_claimant_date.__name__,
     },
 ]
 
@@ -116,20 +117,65 @@ def construct_run_config_with_defaults(run_config):
     return new_cfg
 
 
-def generate_sequence_classification_examples(claims):
+def ge_claimant_date(claims):
+    examples = []
+    for claim in tqdm(claims, desc="generating examples"):
+        text_b = claim.claimant if claim.claimant else "no claimant"
+        text_b += " "
+        text_b += claim.date.split()[0] if claim.date else "no date"
+        examples.append(
+            SequenceClassificationExample(
+                guid=claim.id, text_a=claim.claim, text_b=text_b, label=claim.label,
+            )
+        )
+    return examples
+
+
+def ge_date(claims):
     examples = []
     for claim in tqdm(claims, desc="generating examples"):
         examples.append(
             SequenceClassificationExample(
                 guid=claim.id,
                 text_a=claim.claim,
-                text_b=(claim.claimant if claim.claimant else "no claimant")
-                + " "
-                + (claim.date.split()[0] if claim.date else "no date"),
+                text_b=claim.date.split()[0] if claim.date else "no date",
                 label=claim.label,
             )
         )
     return examples
+
+
+def ge_claimant(claims):
+    examples = []
+    for claim in tqdm(claims, desc="generating examples"):
+        examples.append(
+            SequenceClassificationExample(
+                guid=claim.id,
+                text_a=claim.claim,
+                text_b=claim.claimant if claim.claimant else "no claimant",
+                label=claim.label,
+            )
+        )
+    return examples
+
+
+def ge_vanilla(claims):
+    examples = []
+    for claim in tqdm(claims, desc="generating examples"):
+        examples.append(
+            SequenceClassificationExample(
+                guid=claim.id, text_a=claim.claim, text_b=None, label=claim.label,
+            )
+        )
+    return examples
+
+
+name_to_ge = {
+    ge_claimant_date.__name__: ge_claimant_date,
+    ge_date.__name__: ge_date,
+    ge_claimant.__name__: ge_claimant,
+    ge_vanilla.__name__: ge_vanilla,
+}
 
 
 def get_dataset(run_config):
@@ -142,8 +188,14 @@ def get_examples(run_config):
     train_dataset = get_dataset(run_config)
     eval_dataset = Phase2ValidationDataset.from_raw()
 
-    train_examples = generate_sequence_classification_examples(train_dataset.claims)
-    eval_examples = generate_sequence_classification_examples(eval_dataset.claims)
+    train_examples = name_to_ge[run_config["generate_examples_function"]](
+        train_dataset.claims
+    )
+    eval_examples = name_to_ge[run_config["generate_examples_function"]](
+        eval_dataset.claims
+    )
+    _logger.info("train_examples[0] = %s", train_examples[0].to_json_string())
+    _logger.info("eval_examples[0] = %s", eval_examples[0].to_json_string())
 
     return train_examples, eval_examples
 
