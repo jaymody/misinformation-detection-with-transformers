@@ -268,16 +268,12 @@ def _articles_from_phase2_visit(fpath):
     return article
 
 
-class Phase2TrialDataset(ValerieDataset):
+class Phase2DisjointDataset(Phase2Dataset):
     @classmethod
-    def from_raw(
-        cls,
-        unlabelled_metadata_file="data/phase2-trial/raw/2_trial_metadata.json",
-        labels_file="data/phase2-trial/raw/2_trial_labels.json",
-    ):
+    def from_raw(cls, unlabelled_metadata_file, labelled_metadata_file):
         with open(unlabelled_metadata_file) as fi:
             trial_metadata_unlabelled = json.load(fi)
-        with open(labels_file) as fi:
+        with open(labelled_metadata_file) as fi:
             trial_labels = json.load(fi)
 
         trial_metadata = [
@@ -294,25 +290,30 @@ class Phase2TrialDataset(ValerieDataset):
 
         return cls(claims)
 
+
+class Phase2TrialDataset(Phase2DisjointDataset):
     @classmethod
-    def row_to_claim(cls, i, row):
-        # THIS SHOULD BE KEPT UP TO DATE WITH THE row_to_claim FUNCTION
-        # OF Phase2Dataset. For now, there are two copies of this function,
-        # in the future I'll find a smarter way to do this
+    def from_raw(
+        cls,
+        unlabelled_metadata_file="data/phase2-trial/raw/2_trial_metadata.json",
+        labelled_metadata_file="data/phase2-trial/raw/2_trial_labels.json",
+    ):
+        return super().from_raw(
+            unlabelled_metadata_file=unlabelled_metadata_file,
+            labelled_metadata_file=labelled_metadata_file,
+        )
 
-        row = dict(row)
-        _id = row.pop("id")
 
-        # only parse related articles if it exists
-        # (we do this check since related_articles is a removed field for the eval)
-        related_articles = {}
-        if "related_articles" in row:
-            for k, v in row.pop("related_articles").items():
-                rel_art = cls.__name__ + "/" + os.path.basename(k)
-                related_articles[rel_art] = v
-
-        return Claim(
-            _id, related_articles=related_articles, dataset_name=cls.__name__, **row
+class Phase2ValidationDataset(Phase2DisjointDataset):
+    @classmethod
+    def from_raw(
+        cls,
+        unlabelled_metadata_file="data/phase2-validation/raw/val_metadata_p2.json",
+        labelled_metadata_file="data/phase2-validation/raw/2_labels.json",
+    ):
+        return super().from_raw(
+            unlabelled_metadata_file=unlabelled_metadata_file,
+            labelled_metadata_file=labelled_metadata_file,
         )
 
 
