@@ -1,5 +1,6 @@
 import json
 import pickle
+import random
 import argparse
 import multiprocessing
 
@@ -122,10 +123,13 @@ if __name__ == "__main__":
     parser.add_argument("--output_file", type=str)
     parser.add_argument("--dataset_name", type=str)
     parser.add_argument("--nproc", type=int, default=4)
+    parser.add_argument("--truncate", type=int, default=None)
     args = parser.parse_args()
 
     dataset_class = name_to_dataset[args.dataset_name]
     claims = dataset_class.from_raw().claims
+    if args.truncate:
+        random.sample(claims, k=args.truncate)
 
     pool = multiprocessing.Pool(args.nproc)
     responses = []
