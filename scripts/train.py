@@ -26,6 +26,68 @@ tags = [task_type] + ["phase2", "validation"]
 os.makedirs(base_dir)
 _logger = get_logger(os.path.join(base_dir, "experiment.log"))
 
+
+def ge_claimant_date(claims):
+    examples = []
+    for claim in tqdm(claims, desc="generating examples"):
+        text_b = claim.claimant if claim.claimant else "no claimant"
+        text_b += " "
+        text_b += claim.date.split()[0] if claim.date else "no date"
+        examples.append(
+            SequenceClassificationExample(
+                guid=claim.id, text_a=claim.claim, text_b=text_b, label=claim.label,
+            )
+        )
+    return examples
+
+
+def ge_date(claims):
+    examples = []
+    for claim in tqdm(claims, desc="generating examples"):
+        examples.append(
+            SequenceClassificationExample(
+                guid=claim.id,
+                text_a=claim.claim,
+                text_b=claim.date.split()[0] if claim.date else "no date",
+                label=claim.label,
+            )
+        )
+    return examples
+
+
+def ge_claimant(claims):
+    examples = []
+    for claim in tqdm(claims, desc="generating examples"):
+        examples.append(
+            SequenceClassificationExample(
+                guid=claim.id,
+                text_a=claim.claim,
+                text_b=claim.claimant if claim.claimant else "no claimant",
+                label=claim.label,
+            )
+        )
+    return examples
+
+
+def ge_vanilla(claims):
+    examples = []
+    for claim in tqdm(claims, desc="generating examples"):
+        examples.append(
+            SequenceClassificationExample(
+                guid=claim.id, text_a=claim.claim, text_b=None, label=claim.label,
+            )
+        )
+    return examples
+
+
+name_to_ge = {
+    ge_claimant_date.__name__: ge_claimant_date,
+    ge_date.__name__: ge_date,
+    ge_claimant.__name__: ge_claimant,
+    ge_vanilla.__name__: ge_vanilla,
+}
+
+
 run_configs = [
     {
         "pretrained_model_name_or_path": "roberta-large",
@@ -115,67 +177,6 @@ def construct_run_config_with_defaults(run_config):
             new_cfg[topic] = topic_values
 
     return new_cfg
-
-
-def ge_claimant_date(claims):
-    examples = []
-    for claim in tqdm(claims, desc="generating examples"):
-        text_b = claim.claimant if claim.claimant else "no claimant"
-        text_b += " "
-        text_b += claim.date.split()[0] if claim.date else "no date"
-        examples.append(
-            SequenceClassificationExample(
-                guid=claim.id, text_a=claim.claim, text_b=text_b, label=claim.label,
-            )
-        )
-    return examples
-
-
-def ge_date(claims):
-    examples = []
-    for claim in tqdm(claims, desc="generating examples"):
-        examples.append(
-            SequenceClassificationExample(
-                guid=claim.id,
-                text_a=claim.claim,
-                text_b=claim.date.split()[0] if claim.date else "no date",
-                label=claim.label,
-            )
-        )
-    return examples
-
-
-def ge_claimant(claims):
-    examples = []
-    for claim in tqdm(claims, desc="generating examples"):
-        examples.append(
-            SequenceClassificationExample(
-                guid=claim.id,
-                text_a=claim.claim,
-                text_b=claim.claimant if claim.claimant else "no claimant",
-                label=claim.label,
-            )
-        )
-    return examples
-
-
-def ge_vanilla(claims):
-    examples = []
-    for claim in tqdm(claims, desc="generating examples"):
-        examples.append(
-            SequenceClassificationExample(
-                guid=claim.id, text_a=claim.claim, text_b=None, label=claim.label,
-            )
-        )
-    return examples
-
-
-name_to_ge = {
-    ge_claimant_date.__name__: ge_claimant_date,
-    ge_date.__name__: ge_date,
-    ge_claimant.__name__: ge_claimant,
-    ge_vanilla.__name__: ge_vanilla,
-}
 
 
 def get_dataset(run_config):
