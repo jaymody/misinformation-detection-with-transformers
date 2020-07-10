@@ -616,7 +616,9 @@ def combine_datasets_claims(datasets):
 name_to_dataset = {
     Phase1Dataset.__name__: Phase1Dataset,
     Phase2Dataset.__name__: Phase2Dataset,
+    Phase2DisjointDataset.__name__: Phase2DisjointDataset,
     Phase2TrialDataset.__name__: Phase2TrialDataset,
+    Phase2ValidationDataset.__name__: Phase2ValidationDataset,
     FakeNewsTop50Dataset.__name__: FakeNewsTop50Dataset,
     FakeNewsKaggleDataset.__name__: FakeNewsKaggleDataset,
     FakeNewsNetDataset.__name__: FakeNewsNetDataset,
