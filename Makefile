@@ -22,13 +22,16 @@ fetch:
 	mkdir -p data/phase2-trial
 	gsutil cp -r gs://valerie-bucket/data/phase2-trial/raw data/phase2-trial
 
+	mkdir -p data/phase2-validation
+	gsutil cp -r gs://valerie-bucket/data/phase2-validation/raw data/phase2-validation
+
 	gsutil cp gs://valerie-bucket/data/phase1/raw/metadata.json data/phase1/raw/metadata.json
-	gsutil cp gs://valerie-bucket/data/phase2-1/raw/metadata.json data/phase2-1/raw/metadata.json
+	# gsutil cp gs://valerie-bucket/data/phase2-1/raw/metadata.json data/phase2-1/raw/metadata.json
 	gsutil cp gs://valerie-bucket/data/phase2-3/raw/metadata.json data/phase2-3/raw/metadata.json
 
 fetch_zips:
 	gsutil cp gs://valerie-bucket/data/phase1/train.zip data/phase1/train.zip
-	gsutil cp gs://valerie-bucket/data/phase2-1/train.zip data/phase2-1/train.zip
+	# gsutil cp gs://valerie-bucket/data/phase2-1/train.zip data/phase2-1/train.zip
 	gsutil cp gs://valerie-bucket/data/phase2-3/train.zip data/phase2-3/train.zip
 
 unzip_zips:
@@ -36,9 +39,9 @@ unzip_zips:
 	mkdir -p data/phase1/raw data/phase1/raw
 	unzip data/phase1/train.zip -d data/phase1/raw
 
-	rm -rf data/phase2-1/raw
-	mkdir -p data/phase2-1/raw data/phase2-1/raw
-	unzip data/phase2-1/train.zip -d data/phase2-1/raw
+	# rm -rf data/phase2-1/raw
+	# mkdir -p data/phase2-1/raw data/phase2-1/raw
+	# unzip data/phase2-1/train.zip -d data/phase2-1/raw
 
 	rm -rf data/phase2-3/raw
 	mkdir -p data/phase2-3/raw data/phase2-3/raw
@@ -67,12 +70,15 @@ fetch_external:
 
 push_zips:
 	gsutil cp data/phase1/train.zip gs://valerie-bucket/data/phase1/train.zip
-	gsutil cp data/phase2-1/train.zip gs://valerie-bucket/data/phase2-1/train.zip
+	# gsutil cp data/phase2-1/train.zip gs://valerie-bucket/data/phase2-1/train.zip
 	gsutil cp data/phase2-3/train.zip gs://valerie-bucket/data/phase2-3/train.zip
 
 push_data:
+	gsutil cp -r data/phase2-trial/raw gs://valerie-bucket/data/phase2-trial/raw
+	gsutil cp -r data/phase2-validation/raw gs://valerie-bucket/data/phase2-validation/raw
+
 	gsutil cp data/phase1/raw/metadata.json gs://valerie-bucket/data/phase1/raw/metadata.json
-	gsutil cp data/phase2-1/raw/metadata.json gs://valerie-bucket/data/phase2-1/raw/metadata.json
+	# gsutil cp data/phase2-1/raw/metadata.json gs://valerie-bucket/data/phase2-1/raw/metadata.json
 	gsutil cp data/phase2-3/raw/metadata.json gs://valerie-bucket/data/phase2-3/raw/metadata.json
 
 push_external:
