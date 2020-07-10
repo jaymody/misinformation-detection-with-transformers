@@ -14,7 +14,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     with open(args.metadata_file) as fi:
-        labels = {str(claim["id"]): claim for claim in json.load(fi)}
+        labels = json.load(fi)
     with open(args.predictions_file) as fi:
         predictions = json.load(fi)
 
