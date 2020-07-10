@@ -6,7 +6,7 @@ import argparse
 from multiprocessing import Process
 
 import torch
-import wandb
+import wandb  # pylint: disable=import-error
 import numpy as np
 from tqdm.auto import tqdm
 
