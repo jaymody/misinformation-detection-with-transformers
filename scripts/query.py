@@ -10,7 +10,7 @@ from valerie import search
 from valerie.data import Article
 from valerie.datasets import Phase2Dataset
 from valerie.utils import get_logger
-from valerie.scoring import validate_predictions_phase2, _compute_score_phase2
+from valerie.scoring import validate_predictions_phase2, compute_score_phase2
 from valerie.preprocessing import clean_text
 
 _logger = get_logger()
@@ -28,30 +28,40 @@ def compute_responses_score(responses):
         labels[claim.id] = claim.to_dict()
         predictions[claim.id] = {
             "label": claim.label,
-            "related_articles": [hit["url"] for hit in v["res"]["hits"]["hits"][:2]]
+            "related_articles": {
+                i + 1: x
+                for i, x in enumerate(
+                    [hit["url"] for hit in v["res"]["hits"]["hits"][:2]]
+                )
+            }
             if v["res"]
-            else [],
+            else {},
             "explanation": "",
         }
         perfect_predictions[claim.id] = {
             "label": claim.label,
-            "related_articles": [
-                hit["url"]
-                for hit in v["res"]["hits"]["hits"]
-                if hit["url"] in claim.related_articles.values()
-            ][:2]
+            "related_articles": {
+                i + 1: x
+                for i, x in enumerate(
+                    [
+                        hit["url"]
+                        for hit in v["res"]["hits"]["hits"]
+                        if hit["url"] in claim.related_articles.values()
+                    ][:2]
+                )
+            }
             if v["res"]
-            else [],
+            else {},
             "explanation": "",
         }
 
     validate_predictions_phase2(predictions)
-    score = _compute_score_phase2(labels, predictions)
+    score = compute_score_phase2(labels, predictions)
     validate_predictions_phase2(perfect_predictions)
-    perfect_score = _compute_score_phase2(labels, perfect_predictions)
+    perfect_score = compute_score_phase2(labels, perfect_predictions)
     return {
-        "perfect_score": perfect_score["score"],
-        "perfect_error": perfect_score["error"],
+        "perfect_rerank_score": perfect_score["score"],
+        "perfect_rerank_error": perfect_score["error"],
         "api_score": score["score"],
         "api_error": score["error"],
     }
