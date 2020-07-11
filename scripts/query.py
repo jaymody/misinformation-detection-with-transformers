@@ -143,5 +143,5 @@ if __name__ == "__main__":
     with open(args.output_file, "wb") as fo:
         pickle.dump(responses, fo)
 
-    _logger.info("Missed Queries: %d", sum(1 for v in responses if v["res"] is None))
+    _logger.warning("Missed Queries: %d", sum(1 for v in responses if v["res"] is None))
     _logger.info("Scores: %s", json.dumps(compute_responses_score(responses), indent=2))
