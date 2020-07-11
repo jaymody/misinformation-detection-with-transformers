@@ -84,7 +84,7 @@ def query_expansion(claim):
     )
 
     if claim.date:
-        query += " " + claim.date.split(" ")[0]
+        query += " " + claim.date.split(" ")[0].split("T")[0]
 
     if claim.claimant:
         query += " " + claim.claimant

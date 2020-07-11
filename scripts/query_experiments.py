@@ -78,7 +78,7 @@ def query_func(
     # date
     if do_date and claim.date:
         if add_beginning:
-            query = claim.date.split(" ")[0] + " " + query
+            query = claim.date.split(" ")[0].split("T")[0] + " " + query
         else:
             query += " " + claim.date.split(" ")[0]
 
