@@ -120,6 +120,12 @@ class Article:
             return True
 
         soup = bs4.BeautifulSoup(html, "html.parser")
+
+        # if not valid html, might be already preprocessed text
+        if not bool(soup.find()):
+            text = clean_text(html)
+            return cls(id, content=text, **kwargs)
+
         texts = soup.findAll(text=True)
         texts = filter(tag_visible, texts)
 
