@@ -238,12 +238,11 @@ docker run \
     -e LANG=C.UTF-8 \
     ${DOCKER_IMAGE_NAME}
 
-echo ""
-echo " copying predictions json from container "
+echo "copying predictions json from container"
 docker cp ${DOCKER_CONTAINER_NAME}:/usr/local/predictions.json "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}"
 
+echo "computing submission score/report"
 echo ""
-echo " computing submission score/report "
 python ${WORKING_DIR}/scripts/score_predictions_file.py \
     --metadata_labelled_file "data/phase2-validation/10/metadata-labelled.json" \
     --predictions_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}" \
@@ -269,12 +268,11 @@ docker run \
 run_end_time=`date +%s`
 DOCKER_RUNTIME_100=$((run_end_time-run_start_time))
 
-echo ""
-echo " copying predictions json from container "
+echo "copying predictions json from container"
 docker cp ${DOCKER_CONTAINER_NAME}:/usr/local/predictions.json "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}"
 
+echo "computing submission score/report"
 echo ""
-echo " computing submission score/report "
 python ${WORKING_DIR}/scripts/score_predictions_file.py \
     --metadata_labelled_file "data/phase2-validation/100/metadata-labelled.json" \
     --predictions_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}" \
@@ -302,12 +300,11 @@ docker run \
 run_end_time=`date +%s`
 DOCKER_RUNTIME_500=$((run_end_time-run_start_time))
 
-echo ""
-echo " copying predictions json from container "
+echo "copying predictions json from container"
 docker cp ${DOCKER_CONTAINER_NAME}:/usr/local/predictions.json "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}"
 
+echo "computing submission score/report"
 echo ""
-echo " computing submission score/report "
 python ${WORKING_DIR}/scripts/score_predictions_file.py \
     --metadata_labelled_file "data/phase2-validation/500/metadata-labelled.json" \
     --predictions_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}" \
