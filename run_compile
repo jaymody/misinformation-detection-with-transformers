@@ -318,7 +318,7 @@ python ${WORKING_DIR}/scripts/score_predictions_file.py \
 ################################# Docker Save ##################################
 ################################################################################
 print_title " saving docker image to tar "
-docker save -o "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_TAR_FILE}" ${DOCKER_IMAGE_NAME}
+docker save ${DOCKER_IMAGE_NAME} | tqdm --bytes --total $(docker image inspect ${DOCKER_IMAGE_NAME} --format='{{.Size}}') > "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_TAR_FILE}"
 du -h ${LOCAL_SUBMISSION_DIR}/*.tar
 
 
