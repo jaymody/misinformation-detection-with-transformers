@@ -177,6 +177,12 @@ print_title " downloading gcloud files "
 # as well as a metadata-labelled.json with the labels for each claim as a dict
 # of key (claim_id) and values (dict of "label" and "related_articles")
 gsutil cp "${GCLOUD_BUCKET}/.envrc" .envrc
+
+# tlde set is copied over since we don't have access to internet
+# make sure this is the same location specified in .envrc
+gsutil cp "${GCLOUD_BUCKET}/models/.tld_set" "models/.tld_set"
+
+# test data
 gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/10/metadata.json" "data/phase2-validation/10/metadata.json"
 gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/10/metadata-labelled.json" "data/phase2-validation/10/metadata-labelled.json"
 gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/100/metadata.json" "data/phase2-validation/100/metadata.json"
@@ -184,17 +190,14 @@ gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/100/metadata-labelled.json" "
 gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/500/metadata.json" "data/phase2-validation/500/metadata.json"
 gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/500/metadata-labelled.json" "data/phase2-validation/500/metadata-labelled.json"
 
-gsutil cp "${GCLOUD_BUCKET}/models/source_model.json" models/
-gsutil cp "${GCLOUD_BUCKET}/models/claimant_model.json" models/
-
+# copies all files in the model dir (shallow copy, does not follow subdirs)
 LOCAL_TRANSFORMER_MODEL_DIR="models/fnc"
 mkdir -p ${LOCAL_TRANSFORMER_MODEL_DIR}
+gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/*" ${LOCAL_TRANSFORMER_MODEL_DIR}
 
-gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/config.json" ${LOCAL_TRANSFORMER_MODEL_DIR}
-gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/pytorch_model.bin" ${LOCAL_TRANSFORMER_MODEL_DIR}
-gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/tokenizer_config.json" ${LOCAL_TRANSFORMER_MODEL_DIR}
-gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/vocab.txt" ${LOCAL_TRANSFORMER_MODEL_DIR}
-gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/special_tokens_map.json" ${LOCAL_TRANSFORMER_MODEL_DIR}
+# misc models
+gsutil cp "${GCLOUD_BUCKET}/models/source_model.json" models/
+gsutil cp "${GCLOUD_BUCKET}/models/claimant_model.json" models/
 
 
 
