@@ -12,12 +12,12 @@ source .envrc
 
 # params
 CLAIMANT_MODEL_FILE="models/claimant_model.json"
-FNC_MODEL_DIR="models/fnc"
+PRETRAINED_MODEL_NAME_OR_PATH="models/fnc"
 
 python3 ${SRC_DIR}/pipeline.py \
     --metadata_file ${METADATA_FILE} \
-    --claimant_model_file ${CLAIMANT_MODEL_FILE} \
     --predictions_file ${PREDICTIONS_FILE} \
-    --pretrained_model_name_or_path ${FNC_MODEL_DIR} \
-    --predict_batch_size 8 \
+    --claimant_model_file ${CLAIMANT_MODEL_FILE} \
+    --pretrained_model_name_or_path ${PRETRAINED_MODEL_NAME_OR_PATH} \
+    --predict_batch_size 128 \
     --nproc 4
