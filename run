@@ -1,19 +1,23 @@
 #!/bin/bash
 
-SRC_DIR="/root"
-ENVRC_FILE="${SRC_DIR}/.envrc"
+# input/output
 METADATA_FILE="/usr/local/dataset/metadata.json"
 PREDICTIONS_FILE="/usr/local/predictions.json"
-CLAIMANT_MODEL_FILE="${SRC_DIR}/models/claimant_model.json"
-PRETRAINED_MODEL_NAME_OR_PATH="${SRC_DIR}/models/phase2_classifier"
 
-source ${ENVRC_FILE}
-cd ${SRC_DIR}
+# cd into working dir
+cd /root
+
+# source .envrc
+source .envrc
+
+# params
+CLAIMANT_MODEL_FILE="models/claimant_model.json"
+FNC_MODEL_DIR="models/fnc"
 
 python3 ${SRC_DIR}/pipeline.py \
     --metadata_file ${METADATA_FILE} \
     --claimant_model_file ${CLAIMANT_MODEL_FILE} \
     --predictions_file ${PREDICTIONS_FILE} \
-    --pretrained_model_name_or_path ${PRETRAINED_MODEL_NAME_OR_PATH} \
-    --predict_batch_size 1 \
+    --pretrained_model_name_or_path ${FNC_MODEL_DIR} \
+    --predict_batch_size 8 \
     --nproc 4
