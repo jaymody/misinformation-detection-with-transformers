@@ -14,7 +14,7 @@ source .envrc
 CLAIMANT_MODEL_FILE="models/claimant_model.json"
 PRETRAINED_MODEL_NAME_OR_PATH="models/fnc"
 
-python3 ${SRC_DIR}/pipeline.py \
+python3 pipeline.py \
     --metadata_file ${METADATA_FILE} \
     --predictions_file ${PREDICTIONS_FILE} \
     --claimant_model_file ${CLAIMANT_MODEL_FILE} \
