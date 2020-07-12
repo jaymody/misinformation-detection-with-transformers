@@ -44,7 +44,7 @@ function print_title {
     echo ""
     echo ""
     print_centered "-" "-"
-    print_centered $1 "-"
+    print_centered "$1" "-"
     print_centered "-" "-"
 }
 
