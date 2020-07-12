@@ -60,6 +60,9 @@ class SequenceClassificationExample:
         """Serializes this instance to a JSON string."""
         return json.dumps(dataclasses.asdict(self), indent=2) + "\n"
 
+    def __repr__(self):
+        return self.to_json_string()
+
 
 class SequenceClassificationTrainingArgs(TrainingArguments):
     pass
