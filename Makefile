@@ -18,21 +18,15 @@ test:
 	mkdir -p logs/tests
 	bash run_tests 2>&1 | tee logs/tests/test.log
 
-fetch:
-	mkdir -p data/phase2-trial
-	gsutil cp -r gs://valerie-bucket/data/phase2-trial/raw data/phase2-trial
-
-	mkdir -p data/phase2-validation
-	gsutil cp -r gs://valerie-bucket/data/phase2-validation/raw data/phase2-validation
-
-	gsutil cp gs://valerie-bucket/data/phase1/raw/metadata.json data/phase1/raw/metadata.json
-	# gsutil cp gs://valerie-bucket/data/phase2-1/raw/metadata.json data/phase2-1/raw/metadata.json
-	gsutil cp gs://valerie-bucket/data/phase2-3/raw/metadata.json data/phase2-3/raw/metadata.json
-
 fetch_zips:
 	gsutil cp gs://valerie-bucket/data/phase1/train.zip data/phase1/train.zip
 	# gsutil cp gs://valerie-bucket/data/phase2-1/train.zip data/phase2-1/train.zip
 	gsutil cp gs://valerie-bucket/data/phase2-3/train.zip data/phase2-3/train.zip
+
+push_zips:
+	gsutil cp data/phase1/train.zip gs://valerie-bucket/data/phase1/train.zip
+	# gsutil cp data/phase2-1/train.zip gs://valerie-bucket/data/phase2-1/train.zip
+	gsutil cp data/phase2-3/train.zip gs://valerie-bucket/data/phase2-3/train.zip
 
 unzip_zips:
 	rm -rf data/phase1/raw
@@ -46,6 +40,46 @@ unzip_zips:
 	rm -rf data/phase2-3/raw
 	mkdir -p data/phase2-3/raw data/phase2-3/raw
 	unzip data/phase2-3/train.zip -d data/phase2-3/raw
+
+fetch:
+	# phase2 trial
+	mkdir -p data/phase2-trial
+	gsutil cp -r gs://valerie-bucket/data/phase2-trial/raw data/phase2-trial
+
+	# phase2 validation
+	mkdir -p data/phase2-validation
+	gsutil cp -r gs://valerie-bucket/data/phase2-validation/raw data/phase2-validation
+
+	# phase2 validation 10, 100, 500
+	gsutil cp -r gs://valerie-bucket/data/phase2-validation/10 data/phase2-validation
+	gsutil cp -r gs://valerie-bucket/data/phase2-validation/100 data/phase2-validation
+	gsutil cp -r gs://valerie-bucket/data/phase2-validation/500 data/phase2-validation
+
+	# phase1
+	gsutil cp gs://valerie-bucket/data/phase1/raw/metadata.json data/phase1/raw/metadata.json
+
+	# phase2
+	# gsutil cp gs://valerie-bucket/data/phase2-1/raw/metadata.json data/phase2-1/raw/metadata.json
+	gsutil cp gs://valerie-bucket/data/phase2-3/raw/metadata.json data/phase2-3/raw/metadata.json
+
+push:
+	# phase2 trial
+	gsutil cp -r data/phase2-trial/raw gs://valerie-bucket/data/phase2-trial/raw
+
+	# phase2 validation
+	gsutil cp -r data/phase2-validation/raw gs://valerie-bucket/data/phase2-validation/raw
+
+	# phase2 validation 10, 100, 500
+	gsutil cp -r data/phase2-validation/10 gs://valerie-bucket/data/phase2-validation/10
+	gsutil cp -r data/phase2-validation/100 gs://valerie-bucket/data/phase2-validation/100
+	gsutil cp -r data/phase2-validation/500 gs://valerie-bucket/data/phase2-validation/500
+
+	# phase1
+	gsutil cp data/phase1/raw/metadata.json gs://valerie-bucket/data/phase1/raw/metadata.json
+
+	# phase2
+	# gsutil cp data/phase2-1/raw/metadata.json gs://valerie-bucket/data/phase2-1/raw/metadata.json
+	gsutil cp data/phase2-3/raw/metadata.json gs://valerie-bucket/data/phase2-3/raw/metadata.json
 
 fetch_external:
 	gsutil cp gs://valerie-bucket/data/external/2018-12-fake-news-top-50/data/top_2018.csv data/external/2018-12-fake-news-top-50/data/top_2018.csv
@@ -67,19 +101,6 @@ fetch_external:
 
 	gsutil cp gs://valerie-bucket/data/external/liar/train.tsv data/external/liar/train.tsv
 	gsutil cp gs://valerie-bucket/data/external/mrisdal/fake.csv data/external/mrisdal/fake.csv
-
-push_zips:
-	gsutil cp data/phase1/train.zip gs://valerie-bucket/data/phase1/train.zip
-	# gsutil cp data/phase2-1/train.zip gs://valerie-bucket/data/phase2-1/train.zip
-	gsutil cp data/phase2-3/train.zip gs://valerie-bucket/data/phase2-3/train.zip
-
-push_data:
-	gsutil cp -r data/phase2-trial/raw gs://valerie-bucket/data/phase2-trial/raw
-	gsutil cp -r data/phase2-validation/raw gs://valerie-bucket/data/phase2-validation/raw
-
-	gsutil cp data/phase1/raw/metadata.json gs://valerie-bucket/data/phase1/raw/metadata.json
-	# gsutil cp data/phase2-1/raw/metadata.json gs://valerie-bucket/data/phase2-1/raw/metadata.json
-	gsutil cp data/phase2-3/raw/metadata.json gs://valerie-bucket/data/phase2-3/raw/metadata.json
 
 push_external:
 	gsutil cp data/external/2018-12-fake-news-top-50/data/top_2018.csv gs://valerie-bucket/data/external/2018-12-fake-news-top-50/data/top_2018.csv
