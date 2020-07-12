@@ -40,7 +40,7 @@ run_test() {
 
 
 # create test data
-python scripts/phase2_to_test_data.py \
+python scripts/convert_to_test_data.py \
     --metadata_file ${METADATA_FILE} \
     --output_dir ${TEST_OUTPUT_DIR} \
     --truncate 4

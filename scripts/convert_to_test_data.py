@@ -5,7 +5,7 @@ import argparse
 from pathlib import Path
 
 
-def phase2_to_test_data(metadata_file, output_dir, truncate=None):
+def convert_to_test_data(metadata_file, output_dir, truncate=None):
     with open(metadata_file) as fi:
         metadata = json.load(fi)
     metadata = metadata[:truncate]
@@ -39,4 +39,4 @@ if __name__ == "__main__":
     parser.add_argument("--truncate", type=int, default=None)
     args = parser.parse_args()
 
-    phase2_to_test_data(**args.__dict__)
+    convert_to_test_data(**args.__dict__)
