@@ -1,0 +1,373 @@
+#!/bin/bash
+
+################################################################################
+################################## Checklist ###################################
+################################################################################
+# 1. ensure that run/dockerfile/pipeline are appropriately updated
+# 2. ensure the current code is in it's on branch named the same as the submission name
+# 3. change the submission name in this script (make sure it's unique)
+# 4. change the submission description as well
+# 5. change google cloud data/model downloads as necessary
+# 6. uncomment the vm shutdown at the end if needed
+
+
+
+################################################################################
+############################## Helper Functions ################################
+################################################################################
+function print_centered {
+     [[ $# == 0 ]] && return 1
+
+     declare -i TERM_COLS=80
+     declare -i str_len="${#1}"
+     [[ $str_len -ge $TERM_COLS ]] && {
+          echo "$1";
+          return 0;
+     }
+
+     declare -i filler_len="$(( (TERM_COLS - str_len) / 2 ))"
+     [[ $# -ge 2 ]] && ch="${2:0:1}" || ch=" "
+     filler=""
+     for (( i = 0; i < filler_len; i++ )); do
+          filler="${filler}${ch}"
+     done
+
+     printf "%s%s%s" "$filler" "$1" "$filler"
+     [[ $(( (TERM_COLS - str_len) % 2 )) -ne 0 ]] && printf "%s" "${ch}"
+     printf "\n"
+
+     return 0
+}
+
+function print_title {
+    echo ""
+    echo ""
+    echo ""
+    print_centered "-" "-"
+    print_centered $1 "-"
+    print_centered "-" "-"
+}
+
+
+################################################################################
+#################################### Setup #####################################
+################################################################################
+# start script timer
+script_start_time=`date +%s`
+
+# redirect output to logfile
+SCRIPTFILE="${HOME}/run_compile"
+LOGFILE="${HOME}/log.txt"
+exec > $LOGFILE
+exec 2>&1
+
+
+
+################################################################################
+##################################### Vars #####################################
+################################################################################
+
+# edit these for each run
+SUBMISSION_NAME="jaymody_phase2_submission_5"
+DESCRIPTION="
+This submission introduces slighly better query expansions (cleaning the query
+text, removing lone punctuation, and adding the date to the query). The articles
+are still selected using the api score. This submission utilizes a roberta large
+model, trained on the combined phase1 and phase2 dataset with examples being:
+
+[CLS] claim [SEP] claimant date [SEP]
+
+Other than the above, most of pipeline is the same as submission_3.
+
+"
+PRETRAINED_MODEL_NAME_OR_PATH="models/phase2/single-claim-claimant-date/roberta-large-combined-128-2"
+
+
+# you probably don't need to edit the below params
+WORKING_DIR="${HOME}/staging/${SUBMISSION_NAME}"
+REPO_URL="git@github.com:jaymody/valerie.git"
+
+DOCKER_IMAGE_NAME="valerie:0"
+DOCKER_CONTAINER_NAME="submission_run"
+
+SUBMISSION_TAR_FILE="${SUBMISSION_NAME}.tar"
+SUBMISSION_LOG_FILE="${SUBMISSION_NAME}.log"
+SUBMISSION_SCORE_FILE="${SUBMISSION_NAME}_score.json"
+SUBMISSION_SCRIPT_FILE="${SUBMISSION_NAME}_script.sh"
+SUBMISSION_REPORT_FILE="${SUBMISSION_NAME}_report.txt"
+SUBMISSION_PREDICTIONS_FILE="${SUBMISSION_NAME}_predictions.json"
+
+GCLOUD_BUCKET="gs://valerie-bucket"
+GCLOUD_SUBMISSIONS_DIR="${GCLOUD_BUCKET}/submissions"
+GCLOUD_TRANSFORMER_MODEL_DIR="${GCLOUD_BUCKET}/${PRETRAINED_MODEL_NAME_OR_PATH}"
+
+LOCAL_SUBMISSION_DIR=${SUBMISSION_NAME}
+
+
+
+################################################################################
+################### Check GCloud Submission Dir Doesn't Exist ##################
+################################################################################
+gsutil -q stat "${GCLOUD_SUBMISSIONS_DIR}/${LOCAL_SUBMISSION_DIR}/*"
+status_value=$?
+if [ $status_value == 0 ]; then
+    echo "google cloud submissions dir already exists and is not empty, terminating ..."
+    exit
+fi
+
+
+
+################################################################################
+################################# Project Dir ##################################
+################################################################################
+print_title " setting up working dir "
+if [ -d "$WORKING_DIR" ]; then
+  echo "working directory already exists, terminating ..."
+  exit
+fi
+mkdir -p $WORKING_DIR
+cd $WORKING_DIR
+git clone -b ${SUBMISSION_NAME} $REPO_URL .
+echo ""
+
+mkdir -p models
+mkdir -p data/phase2-validation
+mkdir -p logs
+mkdir -p ${LOCAL_SUBMISSION_DIR}
+
+
+
+################################################################################
+################################# Description ##################################
+################################################################################
+print_title " submission details "
+echo "Date: $(date)
+Name: ${SUBMISSION_NAME}
+Version:
+
+$(git log -1)
+
+Description
+-----------
+"
+echo $DESCRIPTION
+
+
+
+################################################################################
+################################# Init Python ##################################
+################################################################################
+print_title " init python "
+export PATH="${HOME}/.pyenv/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+pyenv shell valerie
+which python
+python --version
+
+
+
+################################################################################
+############################## Fetch From GCloud ###############################
+################################################################################
+print_title " downloading gcloud files "
+
+# .envrc should contain: export LEADERS_PRIZE_API_KEY="insert-key-here"
+# validation data dir should have metadata.json, with the labels fields removed,
+# as well as a metadata-labelled.json with the labels for each claim as a dict
+# of key (claim_id) and values (dict of "label" and "related_articles")
+gsutil cp "${GCLOUD_BUCKET}/.envrc" .envrc
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/10/metadata.json" "data/phase2-validation/10/metadata.json"
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/10/metadata-labelled.json" "data/phase2-validation/10/metadata-labelled.json"
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/100/metadata.json" "data/phase2-validation/100/metadata.json"
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/100/metadata-labelled.json" "data/phase2-validation/100/metadata-labelled.json"
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/500/metadata.json" "data/phase2-validation/500/metadata.json"
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/500/metadata-labelled.json" "data/phase2-validation/500/metadata-labelled.json"
+
+gsutil cp "${GCLOUD_BUCKET}/models/source_model.json" models/
+gsutil cp "${GCLOUD_BUCKET}/models/claimant_model.json" models/
+
+LOCAL_TRANSFORMER_MODEL_DIR="models/fnc"
+mkdir -p ${LOCAL_TRANSFORMER_MODEL_DIR}
+
+gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/config.json" ${LOCAL_TRANSFORMER_MODEL_DIR}
+gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/pytorch_model.bin" ${LOCAL_TRANSFORMER_MODEL_DIR}
+gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/tokenizer_config.json" ${LOCAL_TRANSFORMER_MODEL_DIR}
+gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/vocab.txt" ${LOCAL_TRANSFORMER_MODEL_DIR}
+gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/special_tokens_map.json" ${LOCAL_TRANSFORMER_MODEL_DIR}
+
+
+
+################################################################################
+################## Remove Existing Docker Images/Containers ####################
+################################################################################
+print_title " remove existing docker image/container "
+docker rm ${DOCKER_CONTAINER_NAME}
+docker image rm ${DOCKER_IMAGE_NAME}
+
+
+
+################################################################################
+################################# Build Image ##################################
+################################################################################
+print_title " docker build "
+sudo docker build -t ${DOCKER_IMAGE_NAME} .
+
+
+
+################################################################################
+################################ Image Summary #################################
+################################################################################
+print_title " image summary "
+docker history -H ${DOCKER_IMAGE_NAME}
+
+
+
+################################################################################
+########################### Docker Run (--net none)  ###########################
+################################################################################
+print_title " docker run (--net none) "
+docker run \
+    --gpus 1 \
+    --net none \
+    -v ${WORKING_DIR}/data/phase2-validation/10:/usr/local/dataset/:ro \
+    --name ${DOCKER_CONTAINER_NAME} \
+    -e LANG=C.UTF-8 \
+    ${DOCKER_IMAGE_NAME}
+
+echo ""
+echo " copying predictions json from container "
+docker cp ${DOCKER_CONTAINER_NAME}:/usr/local/predictions.json "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}"
+
+echo ""
+echo " computing submission score/report "
+python ${WORKING_DIR}/scripts/score_predictions_file.py \
+    --metadata_labelled_file "data/phase2-validation/10/metadata-labelled.json" \
+    --predictions_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}" \
+    --print true
+
+
+
+################################################################################
+############################### Docker Run (100) ###############################
+################################################################################
+print_title " docker run (100) "
+docker rm ${DOCKER_CONTAINER_NAME}
+
+# for the actual submission, the --net=none option would also be set
+# for cpu use docker, for gpus use nvidia-docker --gpus 1
+run_start_time=`date +%s`
+docker run \
+    --gpus 1 \
+    -v ${WORKING_DIR}/data/phase2-validation/100:/usr/local/dataset/:ro \
+    --name ${DOCKER_CONTAINER_NAME} \
+    -e LANG=C.UTF-8 \
+    ${DOCKER_IMAGE_NAME}
+run_end_time=`date +%s`
+DOCKER_RUNTIME=$((run_end_time-run_start_time))
+
+echo ""
+echo " copying predictions json from container "
+docker cp ${DOCKER_CONTAINER_NAME}:/usr/local/predictions.json "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}"
+
+echo ""
+echo " computing submission score/report "
+python ${WORKING_DIR}/scripts/score_predictions_file.py \
+    --metadata_labelled_file "data/phase2-validation/100/metadata-labelled.json" \
+    --predictions_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}" \
+    --score_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_SCORE_FILE}" \
+    --report_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_REPORT_FILE}" \
+    --print true
+
+
+
+################################################################################
+############################### Docker Run (500) ###############################
+################################################################################
+print_title " docker run (500) "
+docker rm ${DOCKER_CONTAINER_NAME}
+
+# for the actual submission, the --net=none option would also be set
+# for cpu use docker, for gpus use nvidia-docker --gpus 1
+run_start_time=`date +%s`
+docker run \
+    --gpus 1 \
+    -v ${WORKING_DIR}/data/phase2-validation/500:/usr/local/dataset/:ro \
+    --name ${DOCKER_CONTAINER_NAME} \
+    -e LANG=C.UTF-8 \
+    ${DOCKER_IMAGE_NAME}
+run_end_time=`date +%s`
+DOCKER_RUNTIME=$((run_end_time-run_start_time))
+
+echo ""
+echo " copying predictions json from container "
+docker cp ${DOCKER_CONTAINER_NAME}:/usr/local/predictions.json "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}"
+
+echo ""
+echo " computing submission score/report "
+python ${WORKING_DIR}/scripts/score_predictions_file.py \
+    --metadata_labelled_file "data/phase2-validation/500/metadata-labelled.json" \
+    --predictions_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}" \
+    --score_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_SCORE_FILE}" \
+    --report_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_REPORT_FILE}" \
+    --print true
+
+
+
+################################################################################
+################################# Docker Save ##################################
+################################################################################
+print_title " saving docker image to tar "
+docker save -o "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_TAR_FILE}" ${DOCKER_IMAGE_NAME}
+du -h ${LOCAL_SUBMISSION_DIR}/*.tar
+
+
+
+################################################################################
+########################### Upload Files to GCloud #############################
+################################################################################
+print_title " uploading submission "
+cp ${SCRIPTFILE} "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_SCRIPT_FILE}"
+gsutil -m cp -r "${LOCAL_SUBMISSION_DIR}" ${GCLOUD_SUBMISSIONS_DIR}
+
+
+
+################################################################################
+################################### Cleanup ####################################
+################################################################################
+print_title " cleanup "
+cd ${HOME}
+docker rm ${DOCKER_CONTAINER_NAME}
+docker image rm ${DOCKER_IMAGE_NAME}
+rm -rf ${WORKING_DIR}
+df -h
+
+
+
+################################################################################
+#################################### Times #####################################
+################################################################################
+script_end_time=`date +%s`
+SCRIPT_RUNTIME=$((script_end_time-script_start_time))
+print_title " times
+Total:      $(printf '%02dh:%02dm:%02ds\n' $((${SCRIPT_RUNTIME}/3600)) $((${SCRIPT_RUNTIME}%3600/60)) $((${SCRIPT_RUNTIME}%60)))
+Container:  $(printf '%02dh:%02dm:%02ds\n' $((${DOCKER_RUNTIME}/3600)) $((${DOCKER_RUNTIME}%3600/60)) $((${DOCKER_RUNTIME}%60)))
+"
+
+
+
+################################################################################
+##################################### Done #####################################
+################################################################################
+print_title " done "
+gsutil cp ${LOGFILE} "${GCLOUD_SUBMISSIONS_DIR}/${LOCAL_SUBMISSION_DIR}/${SUBMISSION_LOG_FILE}"
+
+
+
+################################################################################
+################################ Stop Instance #################################
+################################################################################
+print_title " stopping instance "
+gcloud compute instances stop --zone "us-central1-a" valerie-gpu
+
+print_title " done done "
