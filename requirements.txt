@@ -1,11 +1,11 @@
-mkl
-torch
-scikit-learn
-spacy
-wordninja
-tldextract
-tqdm
-pandas
-bs4
--e git+https://github.com/jaymody/transformers#egg=transformers
-requests
+mkl==2019.0
+torch==1.5.0
+scikit-learn==0.23.1
+spacy==2.2.4
+wordninja==2.0.0
+tldextract==2.2.2
+tqdm==4.46.0
+pandas==1.0.3
+bs4==0.0.1
+-e git+https://github.com/jaymody/transformers@2f64fd85dcc61a9e1156843daa978f7dbe480c1e#egg=transformers
+requests==2.23.0
