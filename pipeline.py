@@ -217,7 +217,7 @@ def sequence_classification(
 ):
     examples = generate_sequence_classification_examples(claims)
     _logger.info(
-        json.dumps([example.to_json_string() for example in examples[:5]], indent=2)
+        "%s", json.dumps([example.__dict__ for example in examples[:5]], indent=2),
     )
 
     probabilities = _sequence_classification(
