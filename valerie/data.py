@@ -54,6 +54,11 @@ class Claim:
     def from_dict(cls, d):
         return cls(**d)
 
+    def logstr(self, fields_to_keep=[]):
+        fields_to_keep += ["id", "claim", "claimant", "date"]
+        _out_dict = {k: v for k, v in self.__dict__.items() if k in fields_to_keep}
+        return json.dumps(_out_dict, indent=2)
+
     def __repr__(self):
         return json.dumps(self.__dict__, indent=2)
 
@@ -139,6 +144,15 @@ class Article:
             title = soup.title if soup.title and soup.title.string else None
             title = clean_text(title.string) if title else None
         return cls(id, content=text, title=title, **kwargs)
+
+    def logstr(self, fields_to_keep=[]):
+        fields_to_keep += ["id", "title", "content", "source"]
+        _out_dict = {k: v for k, v in self.__dict__.items() if k in fields_to_keep}
+        if _out_dict["content"] and len(_out_dict["content"]) > 400:
+            _out_dict["content"] = (
+                _out_dict["content"][:200] + " ... " + _out_dict["content"][-200:]
+            )
+        return json.dumps(_out_dict, indent=2)
 
     def __repr__(self):
         return json.dumps(self.__dict__, indent=2)
