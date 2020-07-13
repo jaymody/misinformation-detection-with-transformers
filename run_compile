@@ -77,7 +77,11 @@ model, trained on the combined phase1 and phase2 dataset with examples being:
 
 [CLS] claim [SEP] claimant date [SEP]
 
-Other than the above, most of pipeline is the same as submission_3.
+The pipeline has been updated with some small fixes, better logging, additional
+qof features, and has been refactored (see git log for more details). In
+addition, multiproccesing within the pipeline script has been removed. The
+actual semantic functionalities of the pipeline is all the same as submission_3
+other than the above specified changes.
 
 "
 PRETRAINED_MODEL_NAME_OR_PATH="models/phase2/single-claim-claimant-date/roberta-large-combined-128-2"
@@ -150,7 +154,7 @@ $(git log -1)
 Description
 -----------
 "
-echo $DESCRIPTION
+echo "$DESCRIPTION"
 
 
 
