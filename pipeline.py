@@ -140,7 +140,7 @@ def claimant_classification(claims, claimant_model_file):
     for claim in tqdm(claims, desc="ClaimantModel predictions"):
         pred = claimant_model.predict(claim)
         if pred is None:
-            predictions[claim.id] = int(random.randint(0, 2))
+            predictions[claim.id] = -1
             explanations[claim.id] = ""
             continue
 
