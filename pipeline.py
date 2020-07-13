@@ -3,7 +3,7 @@ import json
 import heapq
 import random
 import argparse
-import multiprocessing
+import collections
 
 import spacy
 import numpy as np
@@ -12,7 +12,7 @@ from tqdm.auto import tqdm
 from valerie import search
 from valerie.data import Article
 from valerie.datasets import Phase2Dataset
-from valerie.utils import get_logger
+from valerie.utils import get_logger, log_title
 from valerie.modeling import (
     ClaimantModel,
     SequenceClassificationExample,
@@ -20,7 +20,7 @@ from valerie.modeling import (
 )
 from valerie.preprocessing import clean_text
 
-_logger = get_logger()
+_logger = get_logger(use_tqdm_handler=False)
 
 # global resources
 label_set = {0, 1, 2}
@@ -35,14 +35,14 @@ furthermore_syns = [
     "Moreover",
 ]
 
-_logger.info("... loading spacy ...")
+log_title(_logger, "loading spacy")
 nlp = spacy.load("en_core_web_lg")
 
 
 ########## Compile Final Output ##########
 
 
-def compile_final_output(claims, seq_clf_predictions, claimant_predictions, support):
+def compile_final_output(claims, seq_clf_predictions, claimant_predictions):
     output = {}
     for claim in claims:
         # label (predicted)
@@ -51,7 +51,7 @@ def compile_final_output(claims, seq_clf_predictions, claimant_predictions, supp
         assert pred in label_set
 
         # related articles
-        related_articles = list(claim.related_articles.keys())
+        related_articles = list(claim.related_articles.values())
         related_articles = related_articles[:2]
         related_articles = {i + 1: x for i, x in enumerate(related_articles)}
         assert isinstance(related_articles, dict)
@@ -65,7 +65,7 @@ def compile_final_output(claims, seq_clf_predictions, claimant_predictions, supp
 
         first_source = None
         try:
-            for sup in support[claim.id]:
+            for sup in claim.support:
                 for i, rel_art in related_articles.items():
                     if (
                         len(explanation) >= 2
@@ -78,7 +78,7 @@ def compile_final_output(claims, seq_clf_predictions, claimant_predictions, supp
                     if len(sup_text) > 340:
                         sup_text = sup_text[:335] + " ..."
 
-                    art = articles[rel_art]
+                    art = articles_dict[rel_art]
                     if len(explanation) == 0:
                         explanation.append(
                             "The claim is {}, as explained in the {} "
@@ -183,7 +183,7 @@ def claimant_classification(claims, claimant_model_file):
 
 
 def _sequence_classification(
-    examples, pretrained_model_name_or_path, predict_batch_size, nproc,
+    examples, pretrained_model_name_or_path, predict_batch_size, nproc
 ):
     model = SequenceClassificationModel.from_pretrained(pretrained_model_name_or_path)
 
@@ -257,31 +257,26 @@ def sequence_classification(
     return predictions, explanations
 
 
-########## Generate Examples ##########
+########## Support ##########
 
 
 def _generate_support(claim, n_examples=4):
     claim_text = claim.claim
     if claim.claimant is not None:
         claim_text += claim.claimant
-    claim_doc = nlp(claim_text, disable=["textcat", "tagger", "parser", "ner"],)
 
     support = []
-    for k in claim.related_articles:
-        article = articles[k]
+    for article_id in claim.related_articles.values():
+        article = articles_dict[article_id]
         if not article.content:
             continue
-        _title = article.title if article.title else ""
-        article_doc = nlp(
-            _title + article.content, disable=["textcat", "tagger", "ner"],
-        )
 
-        for sentence in article_doc.sents:
+        for sentence in article.doc.sents:
             if not np.count_nonzero(sentence.vector):
                 continue
             support.append(
                 {
-                    "similarity": claim_doc.similarity(sentence),
+                    "similarity": claim.doc.similarity(sentence),
                     "art_id": article.id,
                     "text": sentence.text,
                 }
@@ -290,57 +285,87 @@ def _generate_support(claim, n_examples=4):
     return claim, support
 
 
-def generate_support(claims, nproc):
-    pool = multiprocessing.Pool(nproc)
+def generate_support(claims):
+    support_dict = {}
+    for claim in tqdm(claims, total=len(claims), desc="generating support",):
+        claim, support = _generate_support(claim)
+        support_dict[claim.id] = support
 
-    all_support = {}
-    for claim, support in tqdm(
-        pool.imap_unordered(_generate_support, claims),
-        total=len(claims),
-        desc="generating support",
-    ):
-        all_support[claim.id] = support
-    return all_support
+    return support_dict
 
 
 ########## Related Articles ##########
 
 
-def select_related_articles(responses, article_limit=2):
-    # atm, the most succesful strategy for picking related articles
-    # scored by the automated algorithm is using only the api score
-    # (we select top article_limit articles since the response hits are sorted
-    # by the api score)
-    all_articles = {}
+def get_related_articles(claims, keep_n_articles=2):
+    article_dict = {}
+    related_articles_dict = collections.defaultdict(dict)
 
-    for res in tqdm(responses, desc="selecting articles"):
-        claim = res["claim"]
-        claim.related_articles = {}
-        if res["res"] is None:
+    n_total_articles = 0
+    n_empty_articles = 0
+    n_chosen_articles = 0
+    for claim in tqdm(claims, desc="selecting articles"):
+        if claim.res is None:
             continue
+        n_total_articles += len(claim.res["hits"]["hits"])
 
         cur_art = 0
-        for hit in res["res"]["hits"]["hits"]:
-            if cur_art >= article_limit:
-                break
-            if not hit["article"]:
-                continue
-            cur_art += 1
-            all_articles[hit["article"].id] = hit["article"]
-            claim.related_articles[hit["article"].id] = hit["article"]
+        for hit in claim.res["hits"]["hits"]:  # hits are already sorted by api score
+            article = hit["article"]
 
-    return all_articles
+            # stop once we've reached the limit
+            if cur_art >= keep_n_articles:
+                break
+
+            # this should never happen but just incase
+            if not article or not article.content:
+                n_empty_articles += 1
+                continue
+            article_dict[article.id] = article
+            related_articles_dict[claim.id][cur_art + 1] = article.id
+
+            # logging
+            n_chosen_articles += 1
+            cur_art += 1
+
+    _logger.info("  max_total_hits:         %d", len(claims) * 30)
+    _logger.info("  n_total_hits:           %d", n_total_articles)
+    _logger.info("  max_articles_to_keep:   %d", len(claims) * keep_n_articles)
+    _logger.info("  n_chosen_articles:      %d", n_chosen_articles)
+    _logger.info("  n_empty_articles:       %d", n_empty_articles)
+
+    return article_dict, related_articles_dict
+
+
+def generate_article_docs(articles, nproc):
+    def generate_doc_text(article):
+        _title = article.title if article.title else ""
+        return _title + article.content
+
+    article_docs = {
+        article.id: doc
+        for article, doc in tqdm(
+            zip(
+                articles,
+                nlp.pipe(
+                    [generate_doc_text(article) for article in articles],
+                    n_process=nproc,
+                    disable=["textcat", "tagger", "ner"],
+                ),
+            ),
+            total=len(articles),
+            desc="running spacy on articles",
+        )
+    }
+    return article_docs
 
 
 ########## Search ##########
 
 
-# from query.py
 def query_expansion(claim):
-    claim_doc = nlp(claim.claim, disable=["textcat", "tagger", "parser", "ner"])
-
     # stopword removal
-    query_words = [token.text for token in claim_doc if not token.is_stop]
+    query_words = [token.text for token in claim.doc if not token.is_stop]
     query = clean_text(
         " ".join(
             [
@@ -360,7 +385,6 @@ def query_expansion(claim):
     return query
 
 
-# from query.py
 def convert_html_hits_to_article(res):
     visited = set()
     output = []
@@ -380,7 +404,6 @@ def convert_html_hits_to_article(res):
     return output
 
 
-# from query.py
 def search_pipeline(claim):
     query = query_expansion(claim)
     res = search.query(query)
@@ -389,16 +412,41 @@ def search_pipeline(claim):
     return claim, query, res
 
 
-def get_responses(claims, nproc):
-    pool = multiprocessing.Pool(nproc)
-    responses = []
-    for claim, query, res in tqdm(
-        pool.imap_unordered(search_pipeline, claims),
-        total=len(claims),
-        desc="fetching query responses",
-    ):
-        responses.append({"claim": claim, "res": res, "query": query})
-    return responses
+def get_responses(claims):
+    queries = {}
+    responses = {}
+    for claim in tqdm(claims, total=len(claims), desc="fetching query responses"):
+        claim, query, res = search_pipeline(claim)
+        queries[claim.id] = query
+        responses[claim.id] = res
+
+    return queries, responses
+
+
+########## Claims ##########
+
+
+def generate_claim_docs(claims, nproc):
+    claim_docs = {
+        claim.id: doc
+        for claim, doc in tqdm(
+            zip(
+                claims,
+                nlp.pipe(
+                    [claim.claim for claim in claims],
+                    n_process=nproc,
+                    disable=["textcat", "tagger", "parser", "ner"],
+                ),
+            ),
+            total=len(claims),
+            desc="running spacy on claim.claim",
+        )
+    }
+    return claim_docs
+
+
+def get_claims(metadata_file):
+    return Phase2Dataset.from_raw(metadata_file, setify=False).claims
 
 
 ########## Main ##########
@@ -412,52 +460,117 @@ if __name__ == "__main__":
     parser.add_argument("--pretrained_model_name_or_path", type=str)
     parser.add_argument("--predict_batch_size", type=int, default=1)
     parser.add_argument("--nproc", type=int, default=1)
-    args = parser.parse_args()
+    parser_args = parser.parse_args()
 
-    # read metadata and convert to claims objects
-    _logger.info("... reading claims from {} ...".format(args.metadata_file))
-    claims = Phase2Dataset.from_raw(args.metadata_file, setify=False).claims
+    # read metadata
+    log_title(_logger, "reading claims from {}".format(parser_args.metadata_file))
+    claims = get_claims(parser_args.metadata_file)
+
+    # generate claim spacy docs
+    log_title(_logger, "generating claim spacy docs")
+    claim_docs = generate_claim_docs(claims, nproc=parser_args.nproc)
+    for claim in claims:
+        claim.doc = claim_docs[claim.id]
 
     # fetch search api responses
-    _logger.info("... fetching query responses ...")
-    responses = get_responses(claims, args.nproc)
+    log_title(_logger, "fetching query responses")
+    queries, responses = get_responses(claims)
+
+    null_responses = 0
+    no_hits_responses = 0
+    for i, claim in enumerate(claims):
+        claim.query = queries[claim.id]
+        claim.res = responses[claim.id]
+
+        if i < 5:
+            _logger.info("\nclaim: %s\nquery: %s\n", claim.logstr(), claim.query)
+
+        if not claim.res:
+            null_responses += 1
+        elif not claim.res["hits"]["hits"]:
+            no_hits_responses += 1
+
+    _logger.info("  num_claims:         %d", len(claims))
+    _logger.info("  null_responses:     %d", null_responses)
+    _logger.info("  no_hits_responses:  %d", no_hits_responses)
 
     # select related articles
-    _logger.info("... selecting related articles ...")
-    articles = select_related_articles(responses)
+    log_title(_logger, "selecting related articles")
+    articles_dict, related_articles_dict = get_related_articles(
+        claims, keep_n_articles=2
+    )
+    for i, claim in enumerate(claims):
+        claim.related_articles = related_articles_dict[claim.id]
+        if i < 2:
+            for article_id in claim.related_articles.values():
+                _logger.info(
+                    "\nclaim: %s\narticle: %s\n",
+                    claim.logstr(),
+                    articles_dict[article_id].logstr(),
+                )
 
-    # generate supporting article evidence for each claim
-    _logger.info("... generating support ...")
-    try:
-        support = generate_support(claims, nproc=args.nproc)
-    except:
-        support = {}
+    # generate article spacy docs
+    log_title(_logger, "generating articles spacy docs")
+    article_docs = generate_article_docs(
+        articles_dict.values(), nproc=parser_args.nproc
+    )
+    for article in articles_dict.values():
+        article.doc = article_docs[article.id]
 
-    # get sequence classification predictions and explanations
-    _logger.info("... generating sequence classification predictions ...")
-    # print(f"\n\n\n\n{len(claims)}\nHEEYYYY IM HERE\n\n\n\n\n\n\n")
+    # generate supporting article evidence
+    log_title(_logger, "generating support")
+    support_dict = generate_support(claims)
+    for claim in claims:
+        claim.support = support_dict[claim.id]
+
+    # sequence classification predictions and explanations
+    log_title(_logger, "generating sequence classification predictions")
     seq_clf_predictions, seq_clf_explanations = sequence_classification(
-        claims, args.pretrained_model_name_or_path, args.predict_batch_size, args.nproc,
+        claims=claims,
+        pretrained_model_name_or_path=parser_args.pretrained_model_name_or_path,
+        predict_batch_size=parser_args.predict_batch_size,
+        nproc=parser_args.nproc,
     )
+    for i, claim in enumerate(claims):
+        if i > 5:
+            break
+        _logger.info(
+            "\nclaim: %s\npred: %d\nexplanation: %s\n\n",
+            claim.logstr(),
+            seq_clf_predictions[claim.id],
+            seq_clf_explanations[claim.id],
+        )
 
-    # get claimant classification predictions and explanations
-    _logger.info("... generating claimant predictions ...")
+    # claimant classification predictions and explanations
+    log_title(_logger, "generating claimant predictions")
     claimant_predictions, claimant_explanations = claimant_classification(
-        claims, args.claimant_model_file
+        claims=claims, claimant_model_file=parser_args.claimant_model_file
     )
+    for i, claim in enumerate(claims):
+        if i > 5:
+            break
+        _logger.info(
+            "\nclaim: %s\npred: %d\nexplanation: %s\n\n",
+            claim.logstr(),
+            claimant_predictions[claim.id],
+            claimant_explanations[claim.id],
+        )
 
     # compile final output
-    _logger.info("... compiling output ...")
+    log_title(_logger, "compiling output")
     output = compile_final_output(
-        claims, seq_clf_predictions, claimant_predictions, support
+        claims=claims,
+        seq_clf_predictions=seq_clf_predictions,
+        claimant_predictions=claimant_predictions,
     )
+    _logger.info(json.dumps(dict(list(output.items())[:5]), indent=2))
 
     # write output to json
-    _logger.info("... writing predictions to {} ...".format(args.predictions_file))
-    with open(args.predictions_file, "w") as fo:
+    log_title(_logger, "writing predictions to {}".format(parser_args.predictions_file))
+    with open(parser_args.predictions_file, "w") as fo:
         json.dump(output, fo, indent=2)
-    if not os.path.exists(args.predictions_file):
+    if not os.path.exists(parser_args.predictions_file):
         raise ValueError("predictions file was not created")
 
     # done :)
-    _logger.info("... done ...")
+    log_title(_logger, "done")
