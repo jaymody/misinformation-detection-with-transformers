@@ -204,7 +204,7 @@ def generate_sequence_classification_examples(claims):
                 text_a=claim.claim,
                 text_b=(claim.claimant if claim.claimant else "no claimant")
                 + " "
-                + (claim.date.split()[0] if claim.date else "no date"),
+                + (claim.date.split()[0].split("T")[0] if claim.date else "no date"),
                 label=claim.label,
             )
         )
