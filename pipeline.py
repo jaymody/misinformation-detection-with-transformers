@@ -216,6 +216,9 @@ def sequence_classification(
     claims, pretrained_model_name_or_path, predict_batch_size, nproc
 ):
     examples = generate_sequence_classification_examples(claims)
+    _logger.info(
+        json.dumps([example.to_json_string() for example in examples[:5]], indent=2)
+    )
 
     probabilities = _sequence_classification(
         examples,
