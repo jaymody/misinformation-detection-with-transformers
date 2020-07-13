@@ -15,10 +15,13 @@ class TqdmHandler(logging.StreamHandler):
         tqdm.write(msg)
 
 
-def get_logger(logfile=None):
+def get_logger(logfile=None, use_tqdm_handler=True):
     """Gets a nicely formatted logger."""
     formatter = logging.Formatter("[%(asctime)s] %(levelname)s:%(name)s: %(message)s")
-    sh = TqdmHandler()
+    if use_tqdm_handler:
+        sh = TqdmHandler()
+    else:
+        sh = logging.StreamHandler()
     sh.setLevel(logging.INFO)
     sh.setFormatter(formatter)
 
@@ -62,3 +65,19 @@ def stats(values, plot=False):
         plt.show()
 
     return d
+
+
+def log_title(lg, text, length=80, character="."):
+    text = " " + text + " "
+    lg.info("")
+    lg.info(character * length)
+    lg.info(text.center(length, character))
+    lg.info(character * length)
+    lg.info("")
+
+
+def titleize(text, length=80, character="-"):
+    text = " " + text + " "
+    return "\n\n\n{}\n{}\n{}\n\n\n".format(
+        character * length, text.center(length, character), character * length
+    )
