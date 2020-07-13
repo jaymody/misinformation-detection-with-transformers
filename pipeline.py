@@ -4,6 +4,7 @@ import heapq
 import random
 import argparse
 import collections
+import multiprocessing
 
 import spacy
 import numpy as np
@@ -404,21 +405,29 @@ def convert_html_hits_to_article(res):
     return output
 
 
-def search_pipeline(claim):
-    query = query_expansion(claim)
+def search_pipeline(_input):
+    claim_id, query = _input
     res = search.query(query)
     if res is not None:
         res["hits"]["hits"] = convert_html_hits_to_article(res)
-    return claim, query, res
+    return claim_id, query, res
 
 
-def get_responses(claims):
+def get_responses(claims, nproc):
     queries = {}
+    for claim in tqdm(claims, desc="generating queries"):
+        queries[claim.id] = query_expansion(claim)
+
+    pool = multiprocessing.Pool(nproc)
+    _inputs = [(k, query) for k, query in queries.items()]
     responses = {}
-    for claim in tqdm(claims, total=len(claims), desc="fetching query responses"):
-        claim, query, res = search_pipeline(claim)
-        queries[claim.id] = query
-        responses[claim.id] = res
+    for claim_id, query, res in tqdm(
+        pool.imap_unordered(search_pipeline, _inputs),
+        total=len(_inputs),
+        desc="fetching query responses",
+    ):
+        queries[claim_id] = query
+        responses[claim_id] = res
 
     return queries, responses
 
@@ -474,7 +483,7 @@ if __name__ == "__main__":
 
     # fetch search api responses
     log_title(_logger, "fetching query responses")
-    queries, responses = get_responses(claims)
+    queries, responses = get_responses(claims, nproc=parser_args.nproc)
 
     null_responses = 0
     no_hits_responses = 0
