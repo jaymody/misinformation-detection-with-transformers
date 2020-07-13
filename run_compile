@@ -68,20 +68,24 @@ exec 2>&1
 ################################################################################
 
 # edit these for each run
-SUBMISSION_NAME="jaymody_phase2_submission_5"
+SUBMISSION_NAME="jaymody_phase2_submission_6"
 DESCRIPTION="
-This submission introduces slighly better query expansions (cleaning the query
-text, removing lone punctuation, and adding the date to the query). The articles
-are still selected using the api score. This submission utilizes a roberta large
-model, trained on the combined phase1 and phase2 dataset with examples being:
+Same as submission_5, but fetching the responses is now quicker via the
+readdition of multiprocessing. Also, the sequence classification examples are
+logged. Here's a paste of description of submission_5:
 
-[CLS] claim [SEP] claimant date [SEP]
+    This submission introduces slighly better query expansions (cleaning the query
+    text, removing lone punctuation, and adding the date to the query). The articles
+    are still selected using the api score. This submission utilizes a roberta large
+    model, trained on the combined phase1 and phase2 dataset with examples being:
 
-The pipeline has been updated with some small fixes, better logging, additional
-qof features, and has been refactored (see git log for more details). In
-addition, multiproccesing within the pipeline script has been removed. The
-actual semantic functionalities of the pipeline is all the same as submission_3
-other than the above specified changes.
+    [CLS] claim [SEP] claimant date [SEP]
+
+    The pipeline has been updated with some small fixes, better logging, additional
+    qof features, and has been refactored (see git log for more details). In
+    addition, multiproccesing within the pipeline script has been removed. The
+    actual semantic functionalities of the pipeline is all the same as submission_3
+    other than the above specified changes.
 
 "
 PRETRAINED_MODEL_NAME_OR_PATH="models/phase2/single-claim-claimant-date/roberta-large-combined-128-2"
