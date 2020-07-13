@@ -416,7 +416,7 @@ if __name__ == "__main__":
 
     # read metadata and convert to claims objects
     _logger.info("... reading claims from {} ...".format(args.metadata_file))
-    claims = Phase2Dataset.from_raw(args.metadata_file).claims
+    claims = Phase2Dataset.from_raw(args.metadata_file, setify=False).claims
 
     # fetch search api responses
     _logger.info("... fetching query responses ...")

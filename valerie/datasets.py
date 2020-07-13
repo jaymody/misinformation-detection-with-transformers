@@ -21,14 +21,18 @@ _logger = logging.getLogger(__name__)
 
 
 class ValerieDataset:
-    def __init__(self, claims, articles=None):
-        self.claims = list(set(claims))
-        _logger.info(
-            "%s claims set change %d --> %d",
-            self.__class__.__name__,
-            len(claims),
-            len(self.claims),
-        )
+    def __init__(self, claims, articles=None, setify=True):
+        if setify:
+            self.claims = list(set(claims))
+            _logger.info(
+                "%s claims set change %d --> %d",
+                self.__class__.__name__,
+                len(claims),
+                len(self.claims),
+            )
+        else:
+            self.claims = claims
+            _logger.info("len of claims: %d", len(self.claims))
 
         if articles:
             self.articles = list(set(articles))
@@ -190,7 +194,11 @@ def _articles_from_phase1_visit(fpath):
 class Phase2Dataset(ValerieDataset):
     @classmethod
     def from_raw(
-        cls, metadata_file="data/phase2-3/raw/metadata.json", articles_dir=None, nproc=1
+        cls,
+        metadata_file="data/phase2-3/raw/metadata.json",
+        articles_dir=None,
+        nproc=1,
+        setify=True,
     ):
         # because pandas logging sucks
         if not os.path.isfile(metadata_file):
@@ -209,7 +217,7 @@ class Phase2Dataset(ValerieDataset):
         if articles_dir:
             articles = cls.articles_from_phase2(articles_dir, claims, nproc=nproc)
 
-        return cls(claims, articles)
+        return cls(claims, articles, setify=setify)
 
     @classmethod
     def row_to_claim(cls, i, row):
