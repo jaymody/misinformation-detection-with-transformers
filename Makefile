@@ -46,14 +46,13 @@ fetch:
 	mkdir -p data/phase2-trial
 	gsutil cp -r gs://valerie-bucket/data/phase2-trial/raw data/phase2-trial
 
-	# phase2 validation
-	mkdir -p data/phase2-validation
-	gsutil cp -r gs://valerie-bucket/data/phase2-validation/raw data/phase2-validation
+	# phase2 validation 100
+	mkdir -p data/phase2-validation-100
+	gsutil cp -r gs://valerie-bucket/data/phase2-validation-100/raw data/phase2-validation-100
 
-	# phase2 validation 10, 100, 500
-	gsutil cp -r gs://valerie-bucket/data/phase2-validation/10 data/phase2-validation
-	gsutil cp -r gs://valerie-bucket/data/phase2-validation/100 data/phase2-validation
-	gsutil cp -r gs://valerie-bucket/data/phase2-validation/500 data/phase2-validation
+	# phase2 validation 500
+	mkdir -p data/phase2-validation-500
+	gsutil cp -r gs://valerie-bucket/data/phase2-validation-500/raw data/phase2-validation-500
 
 	# phase1
 	gsutil cp gs://valerie-bucket/data/phase1/raw/metadata.json data/phase1/raw/metadata.json
@@ -66,13 +65,11 @@ push:
 	# phase2 trial
 	gsutil cp -r data/phase2-trial/raw gs://valerie-bucket/data/phase2-trial/raw
 
-	# phase2 validation
-	gsutil cp -r data/phase2-validation/raw gs://valerie-bucket/data/phase2-validation/raw
+	# phase2 validation 100
+	gsutil cp -r data/phase2-validation-100/raw gs://valerie-bucket/data/phase2-validation-100/raw
 
-	# phase2 validation 10, 100, 500
-	gsutil cp -r data/phase2-validation/10 gs://valerie-bucket/data/phase2-validation/10
-	gsutil cp -r data/phase2-validation/100 gs://valerie-bucket/data/phase2-validation/100
-	gsutil cp -r data/phase2-validation/500 gs://valerie-bucket/data/phase2-validation/500
+	# phase2 validation 500
+	gsutil cp -r data/phase2-validation-500/raw gs://valerie-bucket/data/phase2-validation-500/raw
 
 	# phase1
 	gsutil cp data/phase1/raw/metadata.json gs://valerie-bucket/data/phase1/raw/metadata.json

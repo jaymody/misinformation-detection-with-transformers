@@ -312,12 +312,25 @@ class Phase2TrialDataset(Phase2DisjointDataset):
         )
 
 
-class Phase2ValidationDataset(Phase2DisjointDataset):
+class Phase2Validation100Dataset(Phase2DisjointDataset):
     @classmethod
     def from_raw(
         cls,
-        unlabelled_metadata_file="data/phase2-validation/raw/val_metadata_p2.json",
-        labelled_metadata_file="data/phase2-validation/raw/2_labels.json",
+        unlabelled_metadata_file="data/phase2-validation-100/raw/metadata.json",
+        labelled_metadata_file="data/phase2-validation-100/raw/labels.json",
+    ):
+        return super().from_raw(
+            unlabelled_metadata_file=unlabelled_metadata_file,
+            labelled_metadata_file=labelled_metadata_file,
+        )
+
+
+class Phase2Validation500Dataset(Phase2DisjointDataset):
+    @classmethod
+    def from_raw(
+        cls,
+        unlabelled_metadata_file="data/phase2-validation-500/raw/val_metadata_p2.json",
+        labelled_metadata_file="data/phase2-validation-500/raw/2_labels.json",
     ):
         return super().from_raw(
             unlabelled_metadata_file=unlabelled_metadata_file,
@@ -626,7 +639,8 @@ name_to_dataset = {
     Phase2Dataset.__name__: Phase2Dataset,
     Phase2DisjointDataset.__name__: Phase2DisjointDataset,
     Phase2TrialDataset.__name__: Phase2TrialDataset,
-    Phase2ValidationDataset.__name__: Phase2ValidationDataset,
+    Phase2Validation100Dataset.__name__: Phase2Validation100Dataset,
+    Phase2Validation500Dataset.__name__: Phase2Validation500Dataset,
     FakeNewsTop50Dataset.__name__: FakeNewsTop50Dataset,
     FakeNewsKaggleDataset.__name__: FakeNewsKaggleDataset,
     FakeNewsNetDataset.__name__: FakeNewsNetDataset,
