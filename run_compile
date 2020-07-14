@@ -200,8 +200,8 @@ gsutil cp "${GCLOUD_BUCKET}/models/.tld_set" "models/.tld_set"
 gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-100/raw/metadata.json" "data/phase2-validation-100/raw/metadata.json"
 gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-100/raw/labels.json" "data/phase2-validation-100/raw/labels.json"
 
-gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-500/raw/metadata.json" "data/phase2-validation-500/raw/metadata.json"
-gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-500/raw/labels.json" "data/phase2-validation-500/raw/labels.json"
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-500/raw/val_metadata_p2.json" "data/phase2-validation-500/raw/metadata.json"
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-500/raw/2_labels.json" "data/phase2-validation-500/raw/labels.json"
 
 # copies all files in the model dir (shallow copy, does not follow subdirs)
 LOCAL_TRANSFORMER_MODEL_DIR="models/fnc"
