@@ -70,9 +70,14 @@ exec 2>&1
 # edit these for each run
 SUBMISSION_NAME="jaymody_phase2_submission_6"
 DESCRIPTION="
-Same as submission_5, but fetching the responses is now quicker via the
-readdition of multiprocessing. Also, the sequence classification examples are
-logged. Here's a paste of description of submission_5:
+Same as submission_5, with a couple of small changes. Fetching the responses is
+now quicker via the readdition of multiprocessing. Sequence classification
+examples are now logged. The new fixed 100 claims validation set is used for the
+normal docker run, and the old 500 validation set is used for the net none run
+(this is because the search api update broke the related articles of the
+validation set, so they only fixed the first 100. this means the responses for
+claims 100 to 500 of the val set are useless, however it's classification score
+is still useful). Here's a paste of description of submission_5:
 
     This submission introduces slighly better query expansions (cleaning the query
     text, removing lone punctuation, and adding the date to the query). The articles
@@ -139,7 +144,8 @@ git clone -b ${SUBMISSION_NAME} $REPO_URL .
 echo ""
 
 mkdir -p models
-mkdir -p data/phase2-validation
+mkdir -p data/phase2-validation-100
+mkdir -p data/phase2-validation-500
 mkdir -p logs
 mkdir -p ${LOCAL_SUBMISSION_DIR}
 
@@ -191,12 +197,11 @@ gsutil cp "${GCLOUD_BUCKET}/.envrc" .envrc
 gsutil cp "${GCLOUD_BUCKET}/models/.tld_set" "models/.tld_set"
 
 # test data
-gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/10/metadata.json" "data/phase2-validation/10/metadata.json"
-gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/10/metadata-labelled.json" "data/phase2-validation/10/metadata-labelled.json"
-gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/100/metadata.json" "data/phase2-validation/100/metadata.json"
-gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/100/metadata-labelled.json" "data/phase2-validation/100/metadata-labelled.json"
-gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/500/metadata.json" "data/phase2-validation/500/metadata.json"
-gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation/500/metadata-labelled.json" "data/phase2-validation/500/metadata-labelled.json"
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-100/raw/metadata.json" "data/phase2-validation-100/raw/metadata.json"
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-100/raw/labels.json" "data/phase2-validation-100/raw/labels.json"
+
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-500/raw/metadata.json" "data/phase2-validation-500/raw/metadata.json"
+gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-500/raw/labels.json" "data/phase2-validation-500/raw/labels.json"
 
 # copies all files in the model dir (shallow copy, does not follow subdirs)
 LOCAL_TRANSFORMER_MODEL_DIR="models/fnc"
@@ -235,13 +240,13 @@ docker history -H ${DOCKER_IMAGE_NAME}
 
 
 ################################################################################
-########################### Docker Run (--net none)  ###########################
+######################### Docker Run (500 --net none)  #########################
 ################################################################################
-print_title " docker run (--net none) "
+print_title " docker run (500 --net none) "
 docker run \
     --gpus 1 \
     --net none \
-    -v ${WORKING_DIR}/data/phase2-validation/10:/usr/local/dataset/:ro \
+    -v ${WORKING_DIR}/data/phase2-validation-500/raw:/usr/local/dataset/:ro \
     --name ${DOCKER_CONTAINER_NAME} \
     -e LANG=C.UTF-8 \
     ${DOCKER_IMAGE_NAME}
@@ -252,7 +257,7 @@ docker cp ${DOCKER_CONTAINER_NAME}:/usr/local/predictions.json "${LOCAL_SUBMISSI
 echo "computing submission score/report"
 echo ""
 python ${WORKING_DIR}/scripts/score_predictions_file.py \
-    --metadata_labelled_file "data/phase2-validation/10/metadata-labelled.json" \
+    --metadata_labelled_file "data/phase2-validation-500/raw/labels.json" \
     --predictions_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}" \
     --print true
 
@@ -269,7 +274,7 @@ docker rm ${DOCKER_CONTAINER_NAME}
 run_start_time=`date +%s`
 docker run \
     --gpus 1 \
-    -v ${WORKING_DIR}/data/phase2-validation/100:/usr/local/dataset/:ro \
+    -v ${WORKING_DIR}/data/phase2-validation-100/raw:/usr/local/dataset/:ro \
     --name ${DOCKER_CONTAINER_NAME} \
     -e LANG=C.UTF-8 \
     ${DOCKER_IMAGE_NAME}
@@ -282,39 +287,7 @@ docker cp ${DOCKER_CONTAINER_NAME}:/usr/local/predictions.json "${LOCAL_SUBMISSI
 echo "computing submission score/report"
 echo ""
 python ${WORKING_DIR}/scripts/score_predictions_file.py \
-    --metadata_labelled_file "data/phase2-validation/100/metadata-labelled.json" \
-    --predictions_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}" \
-    --score_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_SCORE_FILE}" \
-    --report_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_REPORT_FILE}" \
-    --print true
-
-
-
-################################################################################
-############################### Docker Run (500) ###############################
-################################################################################
-print_title " docker run (500) "
-docker rm ${DOCKER_CONTAINER_NAME}
-
-# for the actual submission, the --net=none option would also be set
-# for cpu use docker, for gpus use nvidia-docker --gpus 1
-run_start_time=`date +%s`
-docker run \
-    --gpus 1 \
-    -v ${WORKING_DIR}/data/phase2-validation/500:/usr/local/dataset/:ro \
-    --name ${DOCKER_CONTAINER_NAME} \
-    -e LANG=C.UTF-8 \
-    ${DOCKER_IMAGE_NAME}
-run_end_time=`date +%s`
-DOCKER_RUNTIME_500=$((run_end_time-run_start_time))
-
-echo "copying predictions json from container"
-docker cp ${DOCKER_CONTAINER_NAME}:/usr/local/predictions.json "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}"
-
-echo "computing submission score/report"
-echo ""
-python ${WORKING_DIR}/scripts/score_predictions_file.py \
-    --metadata_labelled_file "data/phase2-validation/500/metadata-labelled.json" \
+    --metadata_labelled_file "data/phase2-validation-100/raw/labels.json" \
     --predictions_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_PREDICTIONS_FILE}" \
     --score_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_SCORE_FILE}" \
     --report_file "${LOCAL_SUBMISSION_DIR}/${SUBMISSION_REPORT_FILE}" \
