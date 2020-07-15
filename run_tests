@@ -5,7 +5,7 @@ ENVRC_FILE=".envrc"
 METADATA_FILE="data/phase2-3/raw/metadata.json"
 CLAIMANT_MODEL_FILE="models/claimant_model.json"
 FNC_MODEL_DIR="models/phase2/single-claim-claimant/bert-base-cased-128-0"
-RERANK_MODEL_DIR="castorini/monobert-large-msmarco"
+RERANK_MODEL_DIR="models/rerank/castroni/monobert-large-msmarco"
 
 TEST_OUTPUT_DIR="logs/tests"
 mkdir -p ${TEST_OUTPUT_DIR}
@@ -53,5 +53,5 @@ source $ENVRC_FILE
 export LEADERS_PRIZE_API_KEY="not-a-real-value"
 run_test "api"
 
-source $ENVRC_FILE
-run_test "test"
+# source $ENVRC_FILE
+# run_test "test"

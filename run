@@ -13,7 +13,7 @@ source .envrc
 # params
 CLAIMANT_MODEL_FILE="models/claimant_model.json"
 FNC_MODEL_DIR="models/fnc"
-RERANK_MODEL_DIR="castorini/monobert-large-msmarco"
+RERANK_MODEL_DIR="models/rerank"
 
 python3 pipeline.py \
     --metadata_file ${METADATA_FILE} \
