@@ -66,7 +66,7 @@ def get_claims(metadata_file):
     return Phase2Dataset.from_raw(metadata_file, setify=False).claims
 
 
-def generate_claim_docs_dict(claims, nproc):
+def generate_claim_docs_dict(claims):
     claim_docs_dict = {
         claim.id: doc
         for claim, doc in tqdm(
@@ -74,7 +74,6 @@ def generate_claim_docs_dict(claims, nproc):
                 claims,
                 nlp.pipe(
                     [claim.claim for claim in claims],
-                    n_process=nproc,
                     disable=["textcat", "tagger", "parser", "ner"],
                 ),
             ),
@@ -167,7 +166,7 @@ def get_responses(claims, nproc):
     return queries, responses
 
 
-def generate_text_a_dict(claims, nproc):
+def generate_text_a_dict(claims):
     def generate_text_a_text(claim):
         text = claim.claim
         text += " "
@@ -183,7 +182,6 @@ def generate_text_a_dict(claims, nproc):
                 claims,
                 nlp.pipe(
                     [generate_text_a_text(claim) for claim in claims],
-                    n_process=nproc,
                     disable=["textcat", "tagger", "parser", "ner"],
                 ),
             ),
@@ -215,7 +213,7 @@ def get_hits_dict(claims):
     }
 
 
-def generate_article_docs_dict(articles, nproc):
+def generate_article_docs_dict(articles):
     def generate_article_doc_text(article):
         text = ""
         if article.source:
@@ -237,7 +235,6 @@ def generate_article_docs_dict(articles, nproc):
                 articles,
                 nlp.pipe(
                     [generate_article_doc_text(article) for article in articles],
-                    n_process=nproc,
                     disable=["textcat", "tagger", "ner"],
                 ),
             ),
@@ -586,14 +583,14 @@ if __name__ == "__main__":
     ### process claims ###
     ######################
     log_title(_logger, "process claims")
-    claim_docs_dict = generate_claim_docs_dict(claims=claims, nproc=parser_args.nproc)
+    claim_docs_dict = generate_claim_docs_dict(claims=claims)
     log_msg = ""
     for i, claim in enumerate(claims):
         claim.doc = claim_docs_dict[claim.id]
         log_msg += "\nclaim_id = {}\n{}\n".format(claim.id, claim.doc.text)
     _logger.info("first 5 claim doc texts:\n%s", log_msg)
 
-    claim_text_a_dict = generate_text_a_dict(claims=claims, nproc=parser_args.nproc)
+    claim_text_a_dict = generate_text_a_dict(claims=claims)
     log_msg = ""
     for i, claim in enumerate(claims):
         claim.text_a = claim_text_a_dict[claim.id]
@@ -653,9 +650,7 @@ if __name__ == "__main__":
     _logger.info("  no_hits_claims:     %d", no_hits_claims)
     _logger.info("first 5 claim hits (resticted to top 5 hits per claim):\n%s", log_msg)
 
-    article_docs_dict = generate_article_docs_dict(
-        articles=articles_dict.values(), nproc=parser_args.nproc
-    )
+    article_docs_dict = generate_article_docs_dict(articles=articles_dict.values())
     for article in articles_dict.values():
         article.doc = article_docs_dict[article.id]
 
