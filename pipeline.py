@@ -42,6 +42,8 @@ nlp = spacy.load("en_core_web_lg")
 ######################################
 ########## Helper Functions ##########
 ######################################
+
+
 def _sequence_classification(
     examples, pretrained_model_name_or_path, predict_batch_size, nproc
 ):
@@ -300,7 +302,8 @@ def generate_rerank_examples(claims):
 def rerank_hits(claims, rerank_model_dir, predict_batch_size, keep_top_n, nproc):
     examples = generate_rerank_examples(claims)
     _logger.info(
-        "%s", json.dumps([example.__dict__ for example in examples[-5:]], indent=2),
+        "first 5 rerank examples:\n%s",
+        json.dumps([example.__dict__ for example in examples[:5]], indent=2),
     )
 
     probabilities = _sequence_classification(
@@ -356,7 +359,8 @@ def generate_sequence_classification_examples(claims):
 def sequence_classification(claims, fnc_model_dir, predict_batch_size, nproc):
     examples = generate_sequence_classification_examples(claims)
     _logger.info(
-        "%s", json.dumps([example.__dict__ for example in examples[-5:]], indent=2),
+        "first 5 sequence classification examples:\n%s",
+        json.dumps([example.__dict__ for example in examples[-5:]], indent=2),
     )
 
     probabilities = _sequence_classification(
@@ -549,9 +553,9 @@ def compile_final_output(
 
 
 if __name__ == "__main__":
-    ############
-    ### cli  ###
-    ############
+    ###########
+    ### cli ###
+    ###########
     parser = argparse.ArgumentParser("Main pipeline for the phase2 submission.")
     parser.add_argument("--metadata_file", type=str)
     parser.add_argument("--predictions_file", type=str)
@@ -567,18 +571,31 @@ if __name__ == "__main__":
     #####################
     log_title(_logger, "reading claims from {}".format(parser_args.metadata_file))
     claims = get_claims(metadata_file=parser_args.metadata_file)
+    log_msg = ""
+    for i, claim in enumerate(claims):
+        if i >= 5:
+            break
+        log_msg += "\n{}\n".format(claim.logstr())
+    _logger.info("first 5 claims:\n%s", log_msg)
 
     ######################
     ### process claims ###
     ######################
     log_title(_logger, "process claims")
     claim_docs_dict = generate_claim_docs_dict(claims=claims, nproc=parser_args.nproc)
-    for claim in claims:
+    log_msg = ""
+    for i, claim in enumerate(claims):
         claim.doc = claim_docs_dict[claim.id]
+        log_msg += "\nclaim_id = {}\n{}\n".format(claim.id, claim.doc.text)
+    _logger.info("first 5 claim doc texts:\n%s", log_msg)
 
     claim_text_a_dict = generate_text_a_dict(claims=claims, nproc=parser_args.nproc)
-    for claim in claims:
+    log_msg = ""
+    for i, claim in enumerate(claims):
         claim.text_a = claim_text_a_dict[claim.id]
+        if i < 5:
+            log_msg += "\nclaim_id = {}\n{}\n".format(claim.id, claim.text_a)
+    _logger.info("first 5 claim text_a:\n%s", log_msg)
 
     #######################
     ### fetch responses ###
@@ -586,19 +603,21 @@ if __name__ == "__main__":
     log_title(_logger, "fetching query responses")
     queries, responses = get_responses(claims=claims, nproc=parser_args.nproc)
 
+    log_msg = ""
     null_responses = 0
     for i, claim in enumerate(claims):
         claim.query = queries[claim.id]
         claim.res = responses[claim.id]
 
         if i < 5:
-            _logger.info("\nclaim: %s\nquery: %s\n", claim.logstr(), claim.query)
+            log_msg += "\nclaim_id = {}\n{}\n".format(claim.id, claim.query)
 
         if not claim.res:
             null_responses += 1
 
     _logger.info("  num_claims:         %d", len(claims))
     _logger.info("  null_responses:     %d", null_responses)
+    _logger.info("first 5 generated queries:\n%s", log_msg)
 
     ########################
     ### process articles ###
@@ -607,15 +626,15 @@ if __name__ == "__main__":
     articles_dict = get_articles_dict(claims=claims)
 
     hits_dict = get_hits_dict(claims=claims)
+    log_msg = ""
     num_total_hits = 0
     no_hits_claims = 0
     for i, claim in enumerate(claims):
         claim.hits = hits_dict[claim.id]
         num_total_hits += len(claim.hits)
         if i < 5:
-            _logger.info(
-                "\nclaim: %s\nhits: %s\n",
-                claim.logstr(),
+            log_msg += "\nclaim_id = {}\n{}\n".format(
+                claim.id,
                 json.dumps(
                     [
                         {"score": hit["score"], "url": hit["url"]}
@@ -628,6 +647,7 @@ if __name__ == "__main__":
             no_hits_claims += 1
     _logger.info("  num_total_hits:     %d", num_total_hits)
     _logger.info("  no_hits_claims:     %d", no_hits_claims)
+    _logger.info("first 5 claim hits (resticted to top 5 hits per claim):\n%s", log_msg)
 
     article_docs_dict = generate_article_docs_dict(
         articles=articles_dict.values(), nproc=parser_args.nproc
@@ -640,14 +660,19 @@ if __name__ == "__main__":
     ########################
     log_title(_logger, "generating support")
     support_dict = generate_support_dict(claims=claims, keep_top_n_sentences=32)
+    log_msg = ""
     for i, claim in enumerate(claims):
         claim.support = support_dict[claim.id]
-        if i < 1:
-            _logger.info(
-                "\nclaim: %s\nsupport: %s\n",
-                claim.logstr(),
-                json.dumps({k: v[:3] for k, v in claim.support.items()}, indent=2),
+        if i < 5:
+            log_msg += "\nclaim_id = {}\n{}\n".format(
+                claim.id,
+                json.dumps(
+                    {k: v[:3] for k, v in list(claim.support.items())[:3]}, indent=2
+                ),
             )
+    _logger.info(
+        "first 5 claim support (top 3 articles, top 3 sentences):\n%s", log_msg
+    )
 
     ##############
     ### rerank ###
@@ -660,15 +685,15 @@ if __name__ == "__main__":
         keep_top_n=2,  # make sure we only keep the top two results
         nproc=parser_args.nproc,
     )
+    log_msg = ""
     for i, claim in enumerate(claims):
         claim.related_articles = rerank_hits_dict[claim.id]
-        if i < 2:
-            for article_id in claim.related_articles.values():
-                _logger.info(
-                    "\nclaim: %s\narticle: %s\n",
-                    claim.logstr(),
-                    articles_dict[article_id].logstr(),
+        if i < 5:
+            for j, article_id in claim.related_articles.items():
+                log_msg += "\nclaim_id = {}\narticle #={}\n{}\n".format(
+                    claim.id, str(j), articles_dict[article_id].logstr(),
                 )
+    _logger.info("first 5 claims chosen reranked articles:\n%s", log_msg)
 
     ###############################
     ### sequence classification ###
@@ -680,15 +705,16 @@ if __name__ == "__main__":
         predict_batch_size=parser_args.predict_batch_size,
         nproc=parser_args.nproc,
     )
+    log_msg = ""
     for i, claim in enumerate(claims):
         if i > 5:
             break
-        _logger.info(
-            "\nclaim: %s\npred: %d\nexplanation: %s\n\n",
-            claim.logstr(),
-            seq_clf_predictions[claim.id],
+        log_msg += "\nclaim_id = {}\npred: {}\nexplanation: {}\n".format(
+            claim.id,
+            str(seq_clf_predictions[claim.id]),
             seq_clf_explanations[claim.id],
         )
+    _logger.info("first 5 sequence classification output results:\n%s", log_msg)
 
     ###############################
     ### claimant classification ###
@@ -697,15 +723,16 @@ if __name__ == "__main__":
     claimant_predictions, claimant_explanations = claimant_classification(
         claims=claims, claimant_model_file=parser_args.claimant_model_file
     )
+    log_msg = ""
     for i, claim in enumerate(claims):
         if i > 5:
             break
-        _logger.info(
-            "\nclaim: %s\npred: %d\nexplanation: %s\n\n",
-            claim.logstr(),
-            claimant_predictions[claim.id],
+        log_msg += "\nclaim_id = {}\npred: {}\nexplanation: {}\n".format(
+            claim.id,
+            str(claimant_predictions[claim.id]),
             claimant_explanations[claim.id],
         )
+    _logger.info("first 5 claimant classification output results:\n%s", log_msg)
 
     ############################
     ### compile final output ###
@@ -717,7 +744,10 @@ if __name__ == "__main__":
         seq_clf_predictions=seq_clf_predictions,
         claimant_predictions=claimant_predictions,
     )
-    _logger.info(json.dumps(dict(list(output.items())[:5]), indent=2))
+    _logger.info(
+        "first 5 output entries:\n%s",
+        json.dumps(dict(list(output.items())[:5]), indent=2),
+    )
 
     #####################################
     ### write output predictions file ###
