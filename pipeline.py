@@ -54,7 +54,7 @@ def _sequence_classification(
 
     # returns an array of probs
     probabilities = prediction_output.predictions
-    return probabilities
+    return probabilities if probabilities is not None else []
 
 
 ############################
@@ -203,12 +203,16 @@ def get_articles_dict(claims):
     return {
         hit["article"].id: hit["article"]
         for claim in claims
+        if claim.res
         for hit in claim.res["hits"]["hits"]
     }
 
 
 def get_hits_dict(claims):
-    return {claim.id: [hit for hit in claim.res["hits"]["hits"]] for claim in claims}
+    return {
+        claim.id: [hit for hit in claim.res["hits"]["hits"]] if claim.res else []
+        for claim in claims
+    }
 
 
 def generate_article_docs_dict(articles, nproc):
