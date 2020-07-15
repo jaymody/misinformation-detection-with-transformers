@@ -39,6 +39,416 @@ log_title(_logger, "loading spacy")
 nlp = spacy.load("en_core_web_lg")
 
 
+######################################
+########## Helper Functions ##########
+######################################
+def _sequence_classification(
+    examples, pretrained_model_name_or_path, predict_batch_size, nproc
+):
+    model = SequenceClassificationModel.from_pretrained(pretrained_model_name_or_path)
+
+    predict_dataset = model.create_dataset(examples=examples, nproc=nproc)
+    prediction_output = model.predict(predict_dataset, predict_batch_size)
+
+    # returns an array of probs
+    probabilities = prediction_output.predictions
+    return probabilities
+
+
+############################
+########## Claims ##########
+############################
+
+
+def get_claims(metadata_file):
+    return Phase2Dataset.from_raw(metadata_file, setify=False).claims
+
+
+def generate_claim_docs_dict(claims, nproc):
+    claim_docs_dict = {
+        claim.id: doc
+        for claim, doc in tqdm(
+            zip(
+                claims,
+                nlp.pipe(
+                    [claim.claim for claim in claims],
+                    n_process=nproc,
+                    disable=["textcat", "tagger", "parser", "ner"],
+                ),
+            ),
+            total=len(claims),
+            desc="running spacy on claim.claim",
+        )
+    }
+    return claim_docs_dict
+
+
+############################
+########## Search ##########
+############################
+
+
+def query_expansion(claim):
+    # stopword removal
+    query_words = [token.text for token in claim.doc if not token.is_stop]
+    query = clean_text(
+        " ".join(
+            [
+                t
+                for t in query_words
+                if t and not len(clean_text(t, remove_punctuation=True)) == 0
+            ]
+        )
+    )
+
+    if claim.date:
+        query += " " + claim.date.split(" ")[0].split("T")[0]
+
+    if claim.claimant:
+        query += " " + claim.claimant
+
+    return query
+
+
+def convert_html_hits_to_article(res):
+    # visited_url is probably uneeded but hopefully visited_content will prevent
+    # exact duplicates (ie the same page but with http vs https, or different
+    # args at the end of the url)
+    visited_url = set()
+    visited_content = set()
+    output = []
+
+    for hit in res["hits"]["hits"]:
+        if hit["url"] in visited_url:
+            continue
+
+        article = Article.from_html(hit["url"], hit["content"], url=hit["url"])
+        if (
+            not article.content
+            or len(article.content) < 32
+            or article.content in visited_content
+        ):
+            continue
+
+        assert article.url == article.id
+        output.append({"score": hit["score"], "article": article, "url": hit["url"]})
+        visited_url.add(article.url)
+        visited_content.add(article.content)
+
+    return output
+
+
+def search_pipeline(_input):
+    claim_id, query = _input
+    res = search.query(query)
+    if res is not None:
+        res["hits"]["hits"] = convert_html_hits_to_article(res)
+    return claim_id, query, res
+
+
+def get_responses(claims, nproc):
+    queries = {}
+    for claim in tqdm(claims, desc="generating queries"):
+        queries[claim.id] = query_expansion(claim)
+
+    pool = multiprocessing.Pool(nproc)
+    _inputs = [(k, query) for k, query in queries.items()]
+    responses = {}
+    for claim_id, query, res in tqdm(
+        pool.imap_unordered(search_pipeline, _inputs),
+        total=len(_inputs),
+        desc="fetching query responses",
+    ):
+        queries[claim_id] = query
+        responses[claim_id] = res
+
+    return queries, responses
+
+
+def generate_text_a_dict(claims, nproc):
+    def generate_text_a_text(claim):
+        text = claim.claim
+        text += " "
+        text += claim.claimant if claim.claimant else "no claimant"
+        text += " "
+        text += claim.date.split()[0].split("T")[0] if claim.date else "no date"
+        return clean_text(text)
+
+    claim_text_a_dict = {
+        claim.id: doc
+        for claim, doc in tqdm(
+            zip(
+                claims,
+                nlp.pipe(
+                    [generate_text_a_text(claim) for claim in claims],
+                    n_process=nproc,
+                    disable=["textcat", "tagger", "parser", "ner"],
+                ),
+            ),
+            total=len(claims),
+            desc="running spacy on claim.claim",
+        )
+    }
+    return claim_text_a_dict
+
+
+##############################
+########## Articles ##########
+##############################
+
+
+def get_articles_dict(claims):
+    return {
+        hit["article"].id: hit["article"]
+        for claim in claims
+        for hit in claim.res["hits"]["hits"]
+    }
+
+
+def get_hits_dict(claims):
+    return {claim.id: [hit for hit in claim.res["hits"]["hits"]] for claim in claims}
+
+
+def generate_article_docs_dict(articles, nproc):
+    def generate_article_doc_text(article):
+        text = ""
+        if article.source:
+            text += article.source + ". "
+        if article.title:
+            text += article.title + ". "
+        if article.url:
+            url_words = extract_words_from_url(article.url)
+            if url_words:
+                text += " ".join(url_words) + ". "
+        if article.content:
+            text += article.content
+        return clean_text(text)
+
+    article_docs_dict = {
+        article.id: doc
+        for article, doc in tqdm(
+            zip(
+                articles,
+                nlp.pipe(
+                    [generate_article_doc_text(article) for article in articles],
+                    n_process=nproc,
+                    disable=["textcat", "tagger", "ner"],
+                ),
+            ),
+            total=len(articles),
+            desc="running spacy on articles",
+        )
+    }
+    return article_docs_dict
+
+
+#############################
+########## Support ##########
+#############################
+
+
+def generate_support_dict(claims, keep_top_n_sentences=32):
+    # we use this for initialization instead of collection.defaultdict(dict)
+    # because there is a possibilty that a claim has no hits in which case we
+    # still want to register an entry for the claim (an empty on at that)
+    support_dict = {claim.id: {} for claim in claims}
+
+    for claim in tqdm(claims, desc="generating support"):
+        for hit in claim.hits:
+            article = hit["article"]
+
+            support = []
+            for sent in article.doc.sents:
+                support.append(
+                    {"text": sent.text, "score": claim.text_a.similarity(sent)}
+                )
+            support = heapq.nlargest(
+                keep_top_n_sentences, support, key=lambda x: x["score"]
+            )
+            support_dict[claim.id][article.id] = support
+
+    return support_dict
+
+
+############################
+########## Rerank ##########
+############################
+
+
+def generate_rerank_examples(claims):
+    def generate_text_b(article, claim):
+        text_b = clean_text(" ".join([s["text"] for s in claim.support[article.id]]))
+        return text_b
+
+    examples = []
+    for claim in tqdm(claims, desc="generating rerank examples"):
+        for hit in claim.hits:
+            article = hit["article"]
+            article.text_b = generate_text_b(article, claim)
+
+            examples.append(
+                SequenceClassificationExample(
+                    guid=claim.id,
+                    text_a=claim.text_a.text,
+                    text_b=article.text_b,
+                    art_id=article.id,
+                )
+            )
+    return examples
+
+
+def rerank_hits(claims, rerank_model_dir, predict_batch_size, keep_top_n, nproc):
+    examples = generate_rerank_examples(claims)
+    _logger.info(
+        "%s", json.dumps([example.__dict__ for example in examples[-5:]], indent=2),
+    )
+
+    probabilities = _sequence_classification(
+        examples, rerank_model_dir, predict_batch_size=predict_batch_size, nproc=nproc,
+    )
+
+    if len(probabilities) != len(examples):
+        raise ValueError(
+            "len predictions ({}) != len examples ({})".format(
+                len(probabilities), len(examples)
+            )
+        )
+
+    # we use this for initialization instead of collection.defaultdict(list)
+    # because there is a possibilty that a claim had a null responses when
+    # queried, which means it has no rerank examples, in which case we still
+    # want it in the below dict, but would be empty
+    rerank_hits_dict = {claim.id: [] for claim in claims}
+    for example, proba in tqdm(zip(examples, probabilities)):
+        proba = float(proba[1])  # gets relatedness score of example
+        rerank_hits_dict[example.guid].append(
+            {"art_id": example.art_id, "score": proba}
+        )
+
+    for k, hits in rerank_hits_dict.items():
+        top_n_hits = heapq.nlargest(keep_top_n, hits, key=lambda x: x["score"])
+        rerank_hits_dict[k] = {i + 1: x["art_id"] for i, x in enumerate(top_n_hits)}
+
+    return rerank_hits_dict
+
+
+#############################################
+########## Sequence Classification ##########
+#############################################
+
+
+def generate_sequence_classification_examples(claims):
+    examples = []
+    for claim in tqdm(claims, desc="generating examples"):
+        examples.append(
+            SequenceClassificationExample(
+                guid=claim.id,
+                text_a=claim.claim,
+                text_b=(claim.claimant if claim.claimant else "no claimant")
+                + " "
+                + (claim.date.split()[0].split("T")[0] if claim.date else "no date"),
+                label=claim.label,
+            )
+        )
+    return examples
+
+
+def sequence_classification(claims, fnc_model_dir, predict_batch_size, nproc):
+    examples = generate_sequence_classification_examples(claims)
+    _logger.info(
+        "%s", json.dumps([example.__dict__ for example in examples[-5:]], indent=2),
+    )
+
+    probabilities = _sequence_classification(
+        examples, fnc_model_dir, predict_batch_size=predict_batch_size, nproc=nproc,
+    )
+
+    if len(probabilities) != len(examples):
+        raise ValueError(
+            "len predictions ({}) != len examples ({})".format(
+                len(probabilities), len(examples)
+            )
+        )
+
+    predictions = {}
+    explanations = {}
+    for example, prob in zip(examples, probabilities):
+        pred = int(np.argmax(prob))
+        assert pred in label_set, pred
+        predictions[example.guid] = pred
+
+        if pred == 0:
+            explanations[example.guid] = (
+                "The AI model detected patterns in the claim consitent with "
+                "misinformation."
+            )
+        elif pred == 1:
+            explanations[example.guid] = (
+                "The AI model detected patterns in the claim consitent with "
+                "clickbait and/or partial truth."
+            )
+        else:
+            explanations[example.guid] = (
+                "The AI model couldn't detect any patterns in the claim "
+                "consitent with misinformation, clickbait, disinformation, or "
+                "fake news, suggesting that the claim is likely true."
+            )
+
+    return predictions, explanations
+
+
+#############################################
+########## Claimant Classification ##########
+#############################################
+
+
+def claimant_classification(claims, claimant_model_file):
+    claimant_model = ClaimantModel.from_pretrained(claimant_model_file)
+
+    predictions = {}
+    explanations = {}
+    for claim in tqdm(claims, desc="ClaimantModel predictions"):
+        pred = claimant_model.predict(claim)
+        if pred is None:
+            predictions[claim.id] = -1
+            explanations[claim.id] = ""
+            continue
+
+        pred = int(np.argmax(pred))
+        assert pred in label_set, pred
+        predictions[claim.id] = pred
+
+        if pred == 0:
+            explanations[claim.id] = (
+                "This is also supported by the fact that the claimant has a history "
+                "of misinformation, having previously made {} (out of {}) "
+                "false statements.".format(
+                    claimant_model.model[claim.claimant]["false"],
+                    claimant_model.model[claim.claimant]["total"],
+                )
+            )
+        elif pred == 1:
+            explanations[claim.id] = (
+                "This is also supported by the fact that the claimant has a mixed "
+                "record, having previously made {} (out of {}) partially "
+                "correct/incorrect statements.".format(
+                    claimant_model.model[claim.claimant]["partly"],
+                    claimant_model.model[claim.claimant]["total"],
+                )
+            )
+        else:
+            explanations[claim.id] = (
+                "This is also supported by the fact that the claimant has a good "
+                "track record, having previously made "
+                "{} (out of {}) factual statements.".format(
+                    claimant_model.model[claim.claimant]["true"],
+                    claimant_model.model[claim.claimant]["total"],
+                )
+            )
+
+    return predictions, explanations
+
+
 ##########################################
 ########## Compile Final Output ##########
 ##########################################
@@ -131,413 +541,6 @@ def compile_final_output(
             "explanation": explanation,
         }
     return output
-
-
-#############################################
-########## Claimant Classification ##########
-#############################################
-
-
-def claimant_classification(claims, claimant_model_file):
-    claimant_model = ClaimantModel.from_pretrained(claimant_model_file)
-
-    predictions = {}
-    explanations = {}
-    for claim in tqdm(claims, desc="ClaimantModel predictions"):
-        pred = claimant_model.predict(claim)
-        if pred is None:
-            predictions[claim.id] = -1
-            explanations[claim.id] = ""
-            continue
-
-        pred = int(np.argmax(pred))
-        assert pred in label_set, pred
-        predictions[claim.id] = pred
-
-        if pred == 0:
-            explanations[claim.id] = (
-                "This is also supported by the fact that the claimant has a history "
-                "of misinformation, having previously made {} (out of {}) "
-                "false statements.".format(
-                    claimant_model.model[claim.claimant]["false"],
-                    claimant_model.model[claim.claimant]["total"],
-                )
-            )
-        elif pred == 1:
-            explanations[claim.id] = (
-                "This is also supported by the fact that the claimant has a mixed "
-                "record, having previously made {} (out of {}) partially "
-                "correct/incorrect statements.".format(
-                    claimant_model.model[claim.claimant]["partly"],
-                    claimant_model.model[claim.claimant]["total"],
-                )
-            )
-        else:
-            explanations[claim.id] = (
-                "This is also supported by the fact that the claimant has a good "
-                "track record, having previously made "
-                "{} (out of {}) factual statements.".format(
-                    claimant_model.model[claim.claimant]["true"],
-                    claimant_model.model[claim.claimant]["total"],
-                )
-            )
-
-    return predictions, explanations
-
-
-#############################################
-########## Sequence Classification ##########
-#############################################
-
-
-def _sequence_classification(
-    examples, pretrained_model_name_or_path, predict_batch_size, nproc
-):
-    model = SequenceClassificationModel.from_pretrained(pretrained_model_name_or_path)
-
-    predict_dataset = model.create_dataset(examples=examples, nproc=nproc)
-    prediction_output = model.predict(predict_dataset, predict_batch_size)
-
-    # returns an array of probs
-    probabilities = prediction_output.predictions
-    return probabilities
-
-
-def generate_sequence_classification_examples(claims):
-    examples = []
-    for claim in tqdm(claims, desc="generating examples"):
-        examples.append(
-            SequenceClassificationExample(
-                guid=claim.id,
-                text_a=claim.claim,
-                text_b=(claim.claimant if claim.claimant else "no claimant")
-                + " "
-                + (claim.date.split()[0].split("T")[0] if claim.date else "no date"),
-                label=claim.label,
-            )
-        )
-    return examples
-
-
-def sequence_classification(claims, fnc_model_dir, predict_batch_size, nproc):
-    examples = generate_sequence_classification_examples(claims)
-    _logger.info(
-        "%s", json.dumps([example.__dict__ for example in examples[-5:]], indent=2),
-    )
-
-    probabilities = _sequence_classification(
-        examples, fnc_model_dir, predict_batch_size=predict_batch_size, nproc=nproc,
-    )
-
-    if len(probabilities) != len(examples):
-        raise ValueError(
-            "len predictions ({}) != len examples ({})".format(
-                len(probabilities), len(examples)
-            )
-        )
-
-    predictions = {}
-    explanations = {}
-    for example, prob in zip(examples, probabilities):
-        pred = int(np.argmax(prob))
-        assert pred in label_set, pred
-        predictions[example.guid] = pred
-
-        if pred == 0:
-            explanations[example.guid] = (
-                "The AI model detected patterns in the claim consitent with "
-                "misinformation."
-            )
-        elif pred == 1:
-            explanations[example.guid] = (
-                "The AI model detected patterns in the claim consitent with "
-                "clickbait and/or partial truth."
-            )
-        else:
-            explanations[example.guid] = (
-                "The AI model couldn't detect any patterns in the claim "
-                "consitent with misinformation, clickbait, disinformation, or "
-                "fake news, suggesting that the claim is likely true."
-            )
-
-    return predictions, explanations
-
-
-############################
-########## Rerank ##########
-############################
-
-
-def generate_rerank_examples(claims):
-    def generate_text_b(article, claim):
-        text_b = clean_text(" ".join([s["text"] for s in claim.support[article.id]]))
-        return text_b
-
-    examples = []
-    for claim in tqdm(claims, desc="generating rerank examples"):
-        for hit in claim.hits:
-            article = hit["article"]
-            article.text_b = generate_text_b(article, claim)
-
-            examples.append(
-                SequenceClassificationExample(
-                    guid=claim.id,
-                    text_a=claim.text_a.text,
-                    text_b=article.text_b,
-                    art_id=article.id,
-                )
-            )
-    return examples
-
-
-def rerank_hits(claims, rerank_model_dir, predict_batch_size, keep_top_n, nproc):
-    examples = generate_rerank_examples(claims)
-    _logger.info(
-        "%s", json.dumps([example.__dict__ for example in examples[-5:]], indent=2),
-    )
-
-    probabilities = _sequence_classification(
-        examples, rerank_model_dir, predict_batch_size=predict_batch_size, nproc=nproc,
-    )
-
-    if len(probabilities) != len(examples):
-        raise ValueError(
-            "len predictions ({}) != len examples ({})".format(
-                len(probabilities), len(examples)
-            )
-        )
-
-    # we use this for initialization instead of collection.defaultdict(list)
-    # because there is a possibilty that a claim had a null responses when
-    # queried, which means it has no rerank examples, in which case we still
-    # want it in the below dict, but would be empty
-    rerank_hits_dict = {claim.id: [] for claim in claims}
-    for example, proba in tqdm(zip(examples, probabilities)):
-        proba = float(proba[1])  # gets relatedness score of example
-        rerank_hits_dict[example.guid].append(
-            {"art_id": example.art_id, "score": proba}
-        )
-
-    for k, hits in rerank_hits_dict.items():
-        top_n_hits = heapq.nlargest(keep_top_n, hits, key=lambda x: x["score"])
-        rerank_hits_dict[k] = {i + 1: x["art_id"] for i, x in enumerate(top_n_hits)}
-
-    return rerank_hits_dict
-
-
-#############################
-########## Support ##########
-#############################
-
-
-def generate_support_dict(claims, keep_top_n_sentences=32):
-    # we use this for initialization instead of collection.defaultdict(dict)
-    # because there is a possibilty that a claim has no hits in which case we
-    # still want to register an entry for the claim (an empty on at that)
-    support_dict = {claim.id: {} for claim in claims}
-
-    for claim in tqdm(claims, desc="generating support"):
-        for hit in claim.hits:
-            article = hit["article"]
-
-            support = []
-            for sent in article.doc.sents:
-                support.append(
-                    {"text": sent.text, "score": claim.text_a.similarity(sent)}
-                )
-            support = heapq.nlargest(
-                keep_top_n_sentences, support, key=lambda x: x["score"]
-            )
-            support_dict[claim.id][article.id] = support
-
-    return support_dict
-
-
-##############################
-########## Articles ##########
-##############################
-
-
-def get_articles_dict(claims):
-    return {
-        hit["article"].id: hit["article"]
-        for claim in claims
-        for hit in claim.res["hits"]["hits"]
-    }
-
-
-def get_hits_dict(claims):
-    return {claim.id: [hit for hit in claim.res["hits"]["hits"]] for claim in claims}
-
-
-def generate_article_docs_dict(articles, nproc):
-    def generate_article_doc_text(article):
-        text = ""
-        if article.source:
-            text += article.source + ". "
-        if article.title:
-            text += article.title + ". "
-        if article.url:
-            url_words = extract_words_from_url(article.url)
-            if url_words:
-                text += " ".join(url_words) + ". "
-        if article.content:
-            text += article.content
-        return clean_text(text)
-
-    article_docs_dict = {
-        article.id: doc
-        for article, doc in tqdm(
-            zip(
-                articles,
-                nlp.pipe(
-                    [generate_article_doc_text(article) for article in articles],
-                    n_process=nproc,
-                    disable=["textcat", "tagger", "ner"],
-                ),
-            ),
-            total=len(articles),
-            desc="running spacy on articles",
-        )
-    }
-    return article_docs_dict
-
-
-############################
-########## Search ##########
-############################
-
-
-def query_expansion(claim):
-    # stopword removal
-    query_words = [token.text for token in claim.doc if not token.is_stop]
-    query = clean_text(
-        " ".join(
-            [
-                t
-                for t in query_words
-                if t and not len(clean_text(t, remove_punctuation=True)) == 0
-            ]
-        )
-    )
-
-    if claim.date:
-        query += " " + claim.date.split(" ")[0].split("T")[0]
-
-    if claim.claimant:
-        query += " " + claim.claimant
-
-    return query
-
-
-def convert_html_hits_to_article(res):
-    # visited_url is probably uneeded but hopefully visited_content will prevent
-    # exact duplicates (ie the same page but with http vs https, or different
-    # args at the end of the url)
-    visited_url = set()
-    visited_content = set()
-    output = []
-
-    for hit in res["hits"]["hits"]:
-        if hit["url"] in visited_url:
-            continue
-
-        article = Article.from_html(hit["url"], hit["content"], url=hit["url"])
-        if (
-            not article.content
-            or len(article.content) < 32
-            or article.content in visited_content
-        ):
-            continue
-
-        assert article.url == article.id
-        output.append({"score": hit["score"], "article": article, "url": hit["url"]})
-        visited_url.add(article.url)
-        visited_content.add(article.content)
-
-    return output
-
-
-def search_pipeline(_input):
-    claim_id, query = _input
-    res = search.query(query)
-    if res is not None:
-        res["hits"]["hits"] = convert_html_hits_to_article(res)
-    return claim_id, query, res
-
-
-def get_responses(claims, nproc):
-    queries = {}
-    for claim in tqdm(claims, desc="generating queries"):
-        queries[claim.id] = query_expansion(claim)
-
-    pool = multiprocessing.Pool(nproc)
-    _inputs = [(k, query) for k, query in queries.items()]
-    responses = {}
-    for claim_id, query, res in tqdm(
-        pool.imap_unordered(search_pipeline, _inputs),
-        total=len(_inputs),
-        desc="fetching query responses",
-    ):
-        queries[claim_id] = query
-        responses[claim_id] = res
-
-    return queries, responses
-
-
-############################
-########## Claims ##########
-############################
-
-
-def get_claims(metadata_file):
-    return Phase2Dataset.from_raw(metadata_file, setify=False).claims
-
-
-def generate_claim_docs_dict(claims, nproc):
-    claim_docs_dict = {
-        claim.id: doc
-        for claim, doc in tqdm(
-            zip(
-                claims,
-                nlp.pipe(
-                    [claim.claim for claim in claims],
-                    n_process=nproc,
-                    disable=["textcat", "tagger", "parser", "ner"],
-                ),
-            ),
-            total=len(claims),
-            desc="running spacy on claim.claim",
-        )
-    }
-    return claim_docs_dict
-
-
-def generate_text_a_dict(claims, nproc):
-    def generate_text_a_text(claim):
-        text = claim.claim
-        text += " "
-        text += claim.claimant if claim.claimant else "no claimant"
-        text += " "
-        text += claim.date.split()[0].split("T")[0] if claim.date else "no date"
-        return clean_text(text)
-
-    claim_text_a_dict = {
-        claim.id: doc
-        for claim, doc in tqdm(
-            zip(
-                claims,
-                nlp.pipe(
-                    [generate_text_a_text(claim) for claim in claims],
-                    n_process=nproc,
-                    disable=["textcat", "tagger", "parser", "ner"],
-                ),
-            ),
-            total=len(claims),
-            desc="running spacy on claim.claim",
-        )
-    }
-    return claim_text_a_dict
 
 
 ##########################
