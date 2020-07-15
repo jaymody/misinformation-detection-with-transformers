@@ -70,30 +70,33 @@ exec 2>&1
 # edit these for each run
 SUBMISSION_NAME="jaymody_phase2_submission_6"
 DESCRIPTION="
-Same as submission_5, with a couple of small changes. Fetching the responses is
-now quicker via the readdition of multiprocessing. Sequence classification
-examples are now logged. The new fixed 100 claims validation set is used for the
-normal docker run, and the old 500 validation set is used for the net none run
-(this is because the search api update broke the related articles of the
-validation set, so they only fixed the first 100. this means the responses for
-claims 100 to 500 of the val set are useless, however it's classification score
-is still useful). Here's a paste of description of submission_5:
+The main change with this submission is that related articles are selected
+using document reranking via monobert. The input examples for reranking are
+claim-article pairs:
 
-    This submission introduces slighly better query expansions (cleaning the query
-    text, removing lone punctuation, and adding the date to the query). The articles
-    are still selected using the api score. This submission utilizes a roberta large
-    model, trained on the combined phase1 and phase2 dataset with examples being:
+[CLS] claim + claimant + date [SEP] top 32 most relevant sentences in the article determined via spacy similarity [SEP]
 
-    [CLS] claim [SEP] claimant date [SEP]
+The top 32 most relevant sentences may also include the words extracted from the
+url, the source of the article (ie CNN), and the title of the article.
 
-    The pipeline has been updated with some small fixes, better logging, additional
-    qof features, and has been refactored (see git log for more details). In
-    addition, multiproccesing within the pipeline script has been removed. The
-    actual semantic functionalities of the pipeline is all the same as submission_3
-    other than the above specified changes.
+The other major addition is the much needed improvment and adoption of logging
+at (almost) all stages of the pipeline for easier debugging and clarity as to
+what is actually going on.
 
+In my experiments, I found a significant boost in the quality of related
+chosen using monobert instead of the api score. This was both consitent in the
+automated score of the related articles as well as through manual inspection.
+
+The only instance where there was a dip in performance was with the 100
+validation dataset (however, I think this is an issue with the last minute
+data fixes).
+
+Screening the text_b content of the rerank examples to the top 32 most relevant
+sentences in the articles also had a significant improvement on the results vs
+simply taking the article content as a whole (most of which will be truncated).
 "
-PRETRAINED_MODEL_NAME_OR_PATH="models/phase2/single-claim-claimant-date/roberta-large-combined-128-2"
+FNC_MODEL_DIR="models/phase2/single-claim-claimant-date/roberta-large-combined-128-2"
+RERANK_MODEL_DIR="models/rerank/castroni/monobert-large-msmarco"
 
 
 # you probably don't need to edit the below params
@@ -112,7 +115,8 @@ SUBMISSION_PREDICTIONS_FILE="${SUBMISSION_NAME}_predictions.json"
 
 GCLOUD_BUCKET="gs://valerie-bucket"
 GCLOUD_SUBMISSIONS_DIR="${GCLOUD_BUCKET}/submissions"
-GCLOUD_TRANSFORMER_MODEL_DIR="${GCLOUD_BUCKET}/${PRETRAINED_MODEL_NAME_OR_PATH}"
+GCLOUD_FNC_MODEL_DIR="${GCLOUD_BUCKET}/${FNC_MODEL_DIR}"
+GCLOUD_RERANK_MODEL_DIR="${GCLOUD_BUCKET}/${RERANK_MODEL_DIR}"
 
 LOCAL_SUBMISSION_DIR=${SUBMISSION_NAME}
 
@@ -204,9 +208,13 @@ gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-500/raw/val_metadata_p2.json"
 gsutil cp "${GCLOUD_BUCKET}/data/phase2-validation-500/raw/2_labels.json" "data/phase2-validation-500/raw/labels.json"
 
 # copies all files in the model dir (shallow copy, does not follow subdirs)
-LOCAL_TRANSFORMER_MODEL_DIR="models/fnc"
-mkdir -p ${LOCAL_TRANSFORMER_MODEL_DIR}
-gsutil cp "${GCLOUD_TRANSFORMER_MODEL_DIR}/*" ${LOCAL_TRANSFORMER_MODEL_DIR}
+LOCAL_FNC_DIR="models/fnc"
+mkdir -p ${LOCAL_FNC_DIR}
+gsutil cp "${GCLOUD_FNC_MODEL_DIR}/*" ${LOCAL_FNC_DIR}
+
+LOCAL_RERANK_DIR="models/rerank"
+mkdir -p ${LOCAL_RERANK_DIR}
+gsutil cp "${GCLOUD_RERANK_MODEL_DIR}/*" ${LOCAL_RERANK_DIR}
 
 # misc models
 gsutil cp "${GCLOUD_BUCKET}/models/source_model.json" models/
