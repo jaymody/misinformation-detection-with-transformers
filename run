@@ -12,12 +12,14 @@ source .envrc
 
 # params
 CLAIMANT_MODEL_FILE="models/claimant_model.json"
-PRETRAINED_MODEL_NAME_OR_PATH="models/fnc"
+FNC_MODEL_DIR="models/fnc"
+RERANK_MODEL_DIR="castorini/monobert-large-msmarco"
 
 python3 pipeline.py \
     --metadata_file ${METADATA_FILE} \
     --predictions_file ${PREDICTIONS_FILE} \
     --claimant_model_file ${CLAIMANT_MODEL_FILE} \
-    --pretrained_model_name_or_path ${PRETRAINED_MODEL_NAME_OR_PATH} \
+    --fnc_model_dir ${FNC_MODEL_DIR} \
+    --rerank_model_dir ${RERANK_MODEL_DIR} \
     --predict_batch_size 128 \
     --nproc 4
