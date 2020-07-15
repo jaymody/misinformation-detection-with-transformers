@@ -4,7 +4,8 @@
 ENVRC_FILE=".envrc"
 METADATA_FILE="data/phase2-3/raw/metadata.json"
 CLAIMANT_MODEL_FILE="models/claimant_model.json"
-PRETRAINED_MODEL_NAME_OR_PATH="models/phase2/single-claim-claimant/bert-base-cased-128-0"
+FNC_MODEL_DIR="models/phase2/single-claim-claimant/bert-base-cased-128-0"
+RERANK_MODEL_DIR="castorini/monobert-large-msmarco"
 
 TEST_OUTPUT_DIR="logs/tests"
 mkdir -p ${TEST_OUTPUT_DIR}
@@ -26,7 +27,8 @@ run_test() {
         --metadata_file ${METADATA_FILE_UNLABELLED} \
         --predictions_file ${PREDICTIONS_FILE} \
         --claimant_model_file ${CLAIMANT_MODEL_FILE} \
-        --pretrained_model_name_or_path ${PRETRAINED_MODEL_NAME_OR_PATH} \
+        --fnc_model_dir ${FNC_MODEL_DIR} \
+        --rerank_model_dir ${RERANK_MODEL_DIR} \
         --predict_batch_size 1 \
         --nproc 4
 
