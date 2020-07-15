@@ -359,7 +359,7 @@ gsutil cp ${LOGFILE} "${GCLOUD_SUBMISSIONS_DIR}/${LOCAL_SUBMISSION_DIR}/${SUBMIS
 ################################################################################
 ################################ Stop Instance #################################
 ################################################################################
-print_title " stopping instance "
-gcloud compute instances stop --zone "us-central1-a" valerie-gpu
+# print_title " stopping instance "
+# gcloud compute instances stop --zone "us-central1-a" valerie-gpu
 
 print_title " done done "
