@@ -344,7 +344,6 @@ SCRIPT_RUNTIME=$((script_end_time-script_start_time))
 print_title " times
 Total:          $(printf '%02dh:%02dm:%02ds\n' $((${SCRIPT_RUNTIME}/3600)) $((${SCRIPT_RUNTIME}%3600/60)) $((${SCRIPT_RUNTIME}%60)))
 Container 100:  $(printf '%02dh:%02dm:%02ds\n' $((${DOCKER_RUNTIME_100}/3600)) $((${DOCKER_RUNTIME_100}%3600/60)) $((${DOCKER_RUNTIME_100}%60)))
-Container 500:  $(printf '%02dh:%02dm:%02ds\n' $((${DOCKER_RUNTIME_500}/3600)) $((${DOCKER_RUNTIME_500}%3600/60)) $((${DOCKER_RUNTIME_500}%60)))
 "
 
 
