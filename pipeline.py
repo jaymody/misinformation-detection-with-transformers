@@ -67,20 +67,11 @@ def get_claims(metadata_file):
 
 
 def generate_claim_docs_dict(claims):
-    claim_docs_dict = {
-        claim.id: doc
-        for claim, doc in tqdm(
-            zip(
-                claims,
-                nlp.pipe(
-                    [claim.claim for claim in claims],
-                    disable=["textcat", "tagger", "parser", "ner"],
-                ),
-            ),
-            total=len(claims),
-            desc="running spacy on claim.claim",
+    claim_docs_dict = {}
+    for claim in tqdm(claims, desc="running spacy on claim.claim"):
+        claim_docs_dict[claim.id] = nlp(
+            claim.claim, disable=["textcat", "tagger", "parser", "ner"]
         )
-    }
     return claim_docs_dict
 
 
@@ -175,20 +166,12 @@ def generate_text_a_dict(claims):
         text += claim.date.split()[0].split("T")[0] if claim.date else "no date"
         return clean_text(text)
 
-    claim_text_a_dict = {
-        claim.id: doc
-        for claim, doc in tqdm(
-            zip(
-                claims,
-                nlp.pipe(
-                    [generate_text_a_text(claim) for claim in claims],
-                    disable=["textcat", "tagger", "parser", "ner"],
-                ),
-            ),
-            total=len(claims),
-            desc="running spacy on claim.claim",
+    claim_text_a_dict = {}
+    for claim in tqdm(claims, desc="running spacy on claim text_a"):
+        doc_text = generate_text_a_text(claim)
+        claim_text_a_dict[claim.id] = nlp(
+            doc_text, disable=["textcat", "tagger", "parser", "ner"]
         )
-    }
     return claim_text_a_dict
 
 
@@ -228,20 +211,13 @@ def generate_article_docs_dict(articles):
             text += article.content
         return clean_text(text)
 
-    article_docs_dict = {
-        article.id: doc
-        for article, doc in tqdm(
-            zip(
-                articles,
-                nlp.pipe(
-                    [generate_article_doc_text(article) for article in articles],
-                    disable=["textcat", "tagger", "ner"],
-                ),
-            ),
-            total=len(articles),
-            desc="running spacy on articles",
+    article_docs_dict = {}
+    for article in tqdm(articles, desc="running spacy on articles"):
+        doc_text = generate_article_doc_text(article)
+        article_docs_dict[article.id] = nlp(
+            doc_text, disable=["textcat", "tagger", "ner"]
         )
-    }
+
     return article_docs_dict
 
 
