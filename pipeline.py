@@ -19,11 +19,10 @@ from valerie.modeling import (
     SequenceClassificationExample,
     SequenceClassificationModel,
 )
-from valerie.preprocessing import clean_text
+from valerie.preprocessing import clean_text, extract_words_from_url
 
 _logger = get_logger(use_tqdm_handler=False)
 
-# global resources
 label_set = {0, 1, 2}
 id2label = {0: "false", 1: "partly true", 2: "true"}
 label2id = {"false": 0, "partly true": 1, "true": 2}
@@ -40,10 +39,14 @@ log_title(_logger, "loading spacy")
 nlp = spacy.load("en_core_web_lg")
 
 
+##########################################
 ########## Compile Final Output ##########
+##########################################
 
 
-def compile_final_output(claims, seq_clf_predictions, claimant_predictions):
+def compile_final_output(
+    claims, articles_dict, seq_clf_predictions, claimant_predictions
+):
     output = {}
     for claim in claims:
         # label (predicted)
@@ -66,43 +69,43 @@ def compile_final_output(claims, seq_clf_predictions, claimant_predictions):
 
         first_source = None
         try:
-            for sup in claim.support:
-                for i, rel_art in related_articles.items():
-                    if (
-                        len(explanation) >= 2
-                        or sup["art_id"] != rel_art
-                        or sup["similarity"] < 0.80
-                    ):
-                        continue
+            for i, art_id in related_articles.items():
+                if art_id not in claim.support or not claim.support[art_id]:
+                    continue
 
-                    sup_text = sup["text"]
-                    if len(sup_text) > 340:
-                        sup_text = sup_text[:335] + " ..."
+                sup = claim.support[art_id][0]
 
-                    art = articles_dict[rel_art]
-                    if len(explanation) == 0:
-                        explanation.append(
-                            "The claim is {}, as explained in the {} "
-                            'article, which states "{}".'.format(
-                                id2label[pred], number2place[i], sup_text,
-                            )
+                if len(explanation) >= 2 or sup["score"] < 0.80:
+                    continue
+
+                sup_text = sup["text"]
+                if len(sup_text) > 340:
+                    sup_text = sup_text[:335] + " ..."
+
+                article = articles_dict[art_id]
+                if len(explanation) == 0:
+                    explanation.append(
+                        "The claim is {}, as explained in the {} "
+                        'article, which states "{}".'.format(
+                            id2label[pred], number2place[i], sup_text,
                         )
-                        first_source = art.source
-                    elif art.source == first_source and first_source is not None:
-                        explanation.append(
-                            '{}, the article goes on to say "{}".'.format(
-                                random.choice(furthermore_syns), sup_text,
-                            )
+                    )
+                    first_source = article.source
+                elif article.source == first_source and first_source is not None:
+                    explanation.append(
+                        '{}, the article goes on to say "{}".'.format(
+                            random.choice(furthermore_syns), sup_text,
                         )
-                    else:
-                        explanation.append(
-                            "This conclusion is also confirmed by the {} article{}, "
-                            '"{}".'.format(
-                                number2place[i],
-                                " from " + art.source if art.source else "",
-                                sup_text[:400],
-                            )
+                    )
+                else:
+                    explanation.append(
+                        "This conclusion is also confirmed by the {} article{}, "
+                        '"{}".'.format(
+                            number2place[i],
+                            " from " + article.source if article.source else "",
+                            sup_text[:400],
                         )
+                    )
         except:
             explanation = []
 
@@ -130,7 +133,9 @@ def compile_final_output(claims, seq_clf_predictions, claimant_predictions):
     return output
 
 
+#############################################
 ########## Claimant Classification ##########
+#############################################
 
 
 def claimant_classification(claims, claimant_model_file):
@@ -180,7 +185,9 @@ def claimant_classification(claims, claimant_model_file):
     return predictions, explanations
 
 
+#############################################
 ########## Sequence Classification ##########
+#############################################
 
 
 def _sequence_classification(
@@ -212,19 +219,14 @@ def generate_sequence_classification_examples(claims):
     return examples
 
 
-def sequence_classification(
-    claims, pretrained_model_name_or_path, predict_batch_size, nproc
-):
+def sequence_classification(claims, fnc_model_dir, predict_batch_size, nproc):
     examples = generate_sequence_classification_examples(claims)
     _logger.info(
-        "%s", json.dumps([example.__dict__ for example in examples[:5]], indent=2),
+        "%s", json.dumps([example.__dict__ for example in examples[-5:]], indent=2),
     )
 
     probabilities = _sequence_classification(
-        examples,
-        pretrained_model_name_or_path,
-        predict_batch_size=predict_batch_size,
-        nproc=nproc,
+        examples, fnc_model_dir, predict_batch_size=predict_batch_size, nproc=nproc,
     )
 
     if len(probabilities) != len(examples):
@@ -261,98 +263,135 @@ def sequence_classification(
     return predictions, explanations
 
 
-########## Support ##########
+############################
+########## Rerank ##########
+############################
 
 
-def _generate_support(claim, n_examples=4):
-    claim_text = claim.claim
-    if claim.claimant is not None:
-        claim_text += claim.claimant
+def generate_rerank_examples(claims):
+    def generate_text_b(article, claim):
+        text_b = clean_text(" ".join([s["text"] for s in claim.support[article.id]]))
+        return text_b
 
-    support = []
-    for article_id in claim.related_articles.values():
-        article = articles_dict[article_id]
-        if not article.content:
-            continue
+    examples = []
+    for claim in tqdm(claims, desc="generating rerank examples"):
+        for hit in claim.hits:
+            article = hit["article"]
+            article.text_b = generate_text_b(article, claim)
 
-        for sentence in article.doc.sents:
-            if not np.count_nonzero(sentence.vector):
-                continue
-            support.append(
-                {
-                    "similarity": claim.doc.similarity(sentence),
-                    "art_id": article.id,
-                    "text": sentence.text,
-                }
+            examples.append(
+                SequenceClassificationExample(
+                    guid=claim.id,
+                    text_a=claim.text_a.text,
+                    text_b=article.text_b,
+                    art_id=article.id,
+                )
             )
-    support = heapq.nlargest(n_examples, support, key=lambda x: x["similarity"])
-    return claim, support
+    return examples
 
 
-def generate_support(claims):
-    support_dict = {}
-    for claim in tqdm(claims, total=len(claims), desc="generating support",):
-        claim, support = _generate_support(claim)
-        support_dict[claim.id] = support
+def rerank_hits(claims, rerank_model_dir, predict_batch_size, keep_top_n, nproc):
+    examples = generate_rerank_examples(claims)
+    _logger.info(
+        "%s", json.dumps([example.__dict__ for example in examples[-5:]], indent=2),
+    )
+
+    probabilities = _sequence_classification(
+        examples, rerank_model_dir, predict_batch_size=predict_batch_size, nproc=nproc,
+    )
+
+    if len(probabilities) != len(examples):
+        raise ValueError(
+            "len predictions ({}) != len examples ({})".format(
+                len(probabilities), len(examples)
+            )
+        )
+
+    # we use this for initialization instead of collection.defaultdict(list)
+    # because there is a possibilty that a claim had a null responses when
+    # queried, which means it has no rerank examples, in which case we still
+    # want it in the below dict, but would be empty
+    rerank_hits_dict = {claim.id: [] for claim in claims}
+    for example, proba in tqdm(zip(examples, probabilities)):
+        proba = float(proba[1])  # gets relatedness score of example
+        rerank_hits_dict[example.guid].append(
+            {"art_id": example.art_id, "score": proba}
+        )
+
+    for k, hits in rerank_hits_dict.items():
+        top_n_hits = heapq.nlargest(keep_top_n, hits, key=lambda x: x["score"])
+        rerank_hits_dict[k] = {i + 1: x["art_id"] for i, x in enumerate(top_n_hits)}
+
+    return rerank_hits_dict
+
+
+#############################
+########## Support ##########
+#############################
+
+
+def generate_support_dict(claims, keep_top_n_sentences=32):
+    # we use this for initialization instead of collection.defaultdict(dict)
+    # because there is a possibilty that a claim has no hits in which case we
+    # still want to register an entry for the claim (an empty on at that)
+    support_dict = {claim.id: {} for claim in claims}
+
+    for claim in tqdm(claims, desc="generating support"):
+        for hit in claim.hits:
+            article = hit["article"]
+
+            support = []
+            for sent in article.doc.sents:
+                support.append(
+                    {"text": sent.text, "score": claim.text_a.similarity(sent)}
+                )
+            support = heapq.nlargest(
+                keep_top_n_sentences, support, key=lambda x: x["score"]
+            )
+            support_dict[claim.id][article.id] = support
 
     return support_dict
 
 
-########## Related Articles ##########
+##############################
+########## Articles ##########
+##############################
 
 
-def get_related_articles(claims, keep_n_articles=2):
-    article_dict = {}
-    related_articles_dict = collections.defaultdict(dict)
-
-    n_total_articles = 0
-    n_empty_articles = 0
-    n_chosen_articles = 0
-    for claim in tqdm(claims, desc="selecting articles"):
-        if claim.res is None:
-            continue
-        n_total_articles += len(claim.res["hits"]["hits"])
-
-        cur_art = 0
-        for hit in claim.res["hits"]["hits"]:  # hits are already sorted by api score
-            article = hit["article"]
-
-            # stop once we've reached the limit
-            if cur_art >= keep_n_articles:
-                break
-
-            # this should never happen but just incase
-            if not article or not article.content:
-                n_empty_articles += 1
-                continue
-            article_dict[article.id] = article
-            related_articles_dict[claim.id][cur_art + 1] = article.id
-
-            # logging
-            n_chosen_articles += 1
-            cur_art += 1
-
-    _logger.info("  max_total_hits:         %d", len(claims) * 30)
-    _logger.info("  n_total_hits:           %d", n_total_articles)
-    _logger.info("  max_articles_to_keep:   %d", len(claims) * keep_n_articles)
-    _logger.info("  n_chosen_articles:      %d", n_chosen_articles)
-    _logger.info("  n_empty_articles:       %d", n_empty_articles)
-
-    return article_dict, related_articles_dict
+def get_articles_dict(claims):
+    return {
+        hit["article"].id: hit["article"]
+        for claim in claims
+        for hit in claim.res["hits"]["hits"]
+    }
 
 
-def generate_article_docs(articles, nproc):
-    def generate_doc_text(article):
-        _title = article.title if article.title else ""
-        return _title + article.content
+def get_hits_dict(claims):
+    return {claim.id: [hit for hit in claim.res["hits"]["hits"]] for claim in claims}
 
-    article_docs = {
+
+def generate_article_docs_dict(articles, nproc):
+    def generate_article_doc_text(article):
+        text = ""
+        if article.source:
+            text += article.source + ". "
+        if article.title:
+            text += article.title + ". "
+        if article.url:
+            url_words = extract_words_from_url(article.url)
+            if url_words:
+                text += " ".join(url_words) + ". "
+        if article.content:
+            text += article.content
+        return clean_text(text)
+
+    article_docs_dict = {
         article.id: doc
         for article, doc in tqdm(
             zip(
                 articles,
                 nlp.pipe(
-                    [generate_doc_text(article) for article in articles],
+                    [generate_article_doc_text(article) for article in articles],
                     n_process=nproc,
                     disable=["textcat", "tagger", "ner"],
                 ),
@@ -361,10 +400,12 @@ def generate_article_docs(articles, nproc):
             desc="running spacy on articles",
         )
     }
-    return article_docs
+    return article_docs_dict
 
 
+############################
 ########## Search ##########
+############################
 
 
 def query_expansion(claim):
@@ -390,20 +431,29 @@ def query_expansion(claim):
 
 
 def convert_html_hits_to_article(res):
-    visited = set()
+    # visited_url is probably uneeded but hopefully visited_content will prevent
+    # exact duplicates (ie the same page but with http vs https, or different
+    # args at the end of the url)
+    visited_url = set()
+    visited_content = set()
     output = []
 
     for hit in res["hits"]["hits"]:
-        if hit["url"] in visited:
+        if hit["url"] in visited_url:
             continue
 
         article = Article.from_html(hit["url"], hit["content"], url=hit["url"])
-        if not article.content or len(article.content) < 32:
+        if (
+            not article.content
+            or len(article.content) < 32
+            or article.content in visited_content
+        ):
             continue
 
         assert article.url == article.id
         output.append({"score": hit["score"], "article": article, "url": hit["url"]})
-        visited.add(hit["url"])
+        visited_url.add(article.url)
+        visited_content.add(article.content)
 
     return output
 
@@ -435,11 +485,17 @@ def get_responses(claims, nproc):
     return queries, responses
 
 
+############################
 ########## Claims ##########
+############################
 
 
-def generate_claim_docs(claims, nproc):
-    claim_docs = {
+def get_claims(metadata_file):
+    return Phase2Dataset.from_raw(metadata_file, setify=False).claims
+
+
+def generate_claim_docs_dict(claims, nproc):
+    claim_docs_dict = {
         claim.id: doc
         for claim, doc in tqdm(
             zip(
@@ -454,42 +510,80 @@ def generate_claim_docs(claims, nproc):
             desc="running spacy on claim.claim",
         )
     }
-    return claim_docs
+    return claim_docs_dict
 
 
-def get_claims(metadata_file):
-    return Phase2Dataset.from_raw(metadata_file, setify=False).claims
+def generate_text_a_dict(claims, nproc):
+    def generate_text_a_text(claim):
+        text = claim.claim
+        text += " "
+        text += claim.claimant if claim.claimant else "no claimant"
+        text += " "
+        text += claim.date.split()[0].split("T")[0] if claim.date else "no date"
+        return clean_text(text)
+
+    claim_text_a_dict = {
+        claim.id: doc
+        for claim, doc in tqdm(
+            zip(
+                claims,
+                nlp.pipe(
+                    [generate_text_a_text(claim) for claim in claims],
+                    n_process=nproc,
+                    disable=["textcat", "tagger", "parser", "ner"],
+                ),
+            ),
+            total=len(claims),
+            desc="running spacy on claim.claim",
+        )
+    }
+    return claim_text_a_dict
 
 
+##########################
 ########## Main ##########
+##########################
 
 
 if __name__ == "__main__":
+    ############
+    ### cli  ###
+    ############
     parser = argparse.ArgumentParser("Main pipeline for the phase2 submission.")
     parser.add_argument("--metadata_file", type=str)
     parser.add_argument("--predictions_file", type=str)
     parser.add_argument("--claimant_model_file", type=str)
-    parser.add_argument("--pretrained_model_name_or_path", type=str)
+    parser.add_argument("--fnc_model_dir", type=str)
+    parser.add_argument("--rerank_model_dir", type=str)
     parser.add_argument("--predict_batch_size", type=int, default=1)
     parser.add_argument("--nproc", type=int, default=1)
     parser_args = parser.parse_args()
 
-    # read metadata
+    #####################
+    ### read metadata ###
+    #####################
     log_title(_logger, "reading claims from {}".format(parser_args.metadata_file))
-    claims = get_claims(parser_args.metadata_file)
+    claims = get_claims(metadata_file=parser_args.metadata_file)
 
-    # generate claim spacy docs
-    log_title(_logger, "generating claim spacy docs")
-    claim_docs = generate_claim_docs(claims, nproc=parser_args.nproc)
+    ######################
+    ### process claims ###
+    ######################
+    log_title(_logger, "process claims")
+    claim_docs_dict = generate_claim_docs_dict(claims=claims, nproc=parser_args.nproc)
     for claim in claims:
-        claim.doc = claim_docs[claim.id]
+        claim.doc = claim_docs_dict[claim.id]
 
-    # fetch search api responses
+    claim_text_a_dict = generate_text_a_dict(claims=claims, nproc=parser_args.nproc)
+    for claim in claims:
+        claim.text_a = claim_text_a_dict[claim.id]
+
+    #######################
+    ### fetch responses ###
+    #######################
     log_title(_logger, "fetching query responses")
-    queries, responses = get_responses(claims, nproc=parser_args.nproc)
+    queries, responses = get_responses(claims=claims, nproc=parser_args.nproc)
 
     null_responses = 0
-    no_hits_responses = 0
     for i, claim in enumerate(claims):
         claim.query = queries[claim.id]
         claim.res = responses[claim.id]
@@ -499,20 +593,72 @@ if __name__ == "__main__":
 
         if not claim.res:
             null_responses += 1
-        elif not claim.res["hits"]["hits"]:
-            no_hits_responses += 1
 
     _logger.info("  num_claims:         %d", len(claims))
     _logger.info("  null_responses:     %d", null_responses)
-    _logger.info("  no_hits_responses:  %d", no_hits_responses)
 
-    # select related articles
-    log_title(_logger, "selecting related articles")
-    articles_dict, related_articles_dict = get_related_articles(
-        claims, keep_n_articles=2
+    ########################
+    ### process articles ###
+    ########################
+    log_title(_logger, "process related articles")
+    articles_dict = get_articles_dict(claims=claims)
+
+    hits_dict = get_hits_dict(claims=claims)
+    num_total_hits = 0
+    no_hits_claims = 0
+    for i, claim in enumerate(claims):
+        claim.hits = hits_dict[claim.id]
+        num_total_hits += len(claim.hits)
+        if i < 5:
+            _logger.info(
+                "\nclaim: %s\nhits: %s\n",
+                claim.logstr(),
+                json.dumps(
+                    [
+                        {"score": hit["score"], "url": hit["url"]}
+                        for hit in claim.hits[:5]
+                    ],
+                    indent=2,
+                ),
+            )
+        if not claim.hits:
+            no_hits_claims += 1
+    _logger.info("  num_total_hits:     %d", num_total_hits)
+    _logger.info("  no_hits_claims:     %d", no_hits_claims)
+
+    article_docs_dict = generate_article_docs_dict(
+        articles=articles_dict.values(), nproc=parser_args.nproc
+    )
+    for article in articles_dict.values():
+        article.doc = article_docs_dict[article.id]
+
+    ########################
+    ### generate support ###
+    ########################
+    log_title(_logger, "generating support")
+    support_dict = generate_support_dict(claims=claims, keep_top_n_sentences=32)
+    for i, claim in enumerate(claims):
+        claim.support = support_dict[claim.id]
+        if i < 1:
+            _logger.info(
+                "\nclaim: %s\nsupport: %s\n",
+                claim.logstr(),
+                json.dumps({k: v[:3] for k, v in claim.support.items()}, indent=2),
+            )
+
+    ##############
+    ### rerank ###
+    ##############
+    log_title(_logger, "rerank and select top 2 articles")
+    rerank_hits_dict = rerank_hits(
+        claims=claims,
+        rerank_model_dir=parser_args.rerank_model_dir,
+        predict_batch_size=parser_args.predict_batch_size,
+        keep_top_n=2,  # make sure we only keep the top two results
+        nproc=parser_args.nproc,
     )
     for i, claim in enumerate(claims):
-        claim.related_articles = related_articles_dict[claim.id]
+        claim.related_articles = rerank_hits_dict[claim.id]
         if i < 2:
             for article_id in claim.related_articles.values():
                 _logger.info(
@@ -521,25 +667,13 @@ if __name__ == "__main__":
                     articles_dict[article_id].logstr(),
                 )
 
-    # generate article spacy docs
-    log_title(_logger, "generating articles spacy docs")
-    article_docs = generate_article_docs(
-        articles_dict.values(), nproc=parser_args.nproc
-    )
-    for article in articles_dict.values():
-        article.doc = article_docs[article.id]
-
-    # generate supporting article evidence
-    log_title(_logger, "generating support")
-    support_dict = generate_support(claims)
-    for claim in claims:
-        claim.support = support_dict[claim.id]
-
-    # sequence classification predictions and explanations
+    ###############################
+    ### sequence classification ###
+    ###############################
     log_title(_logger, "generating sequence classification predictions")
     seq_clf_predictions, seq_clf_explanations = sequence_classification(
         claims=claims,
-        pretrained_model_name_or_path=parser_args.pretrained_model_name_or_path,
+        fnc_model_dir=parser_args.fnc_model_dir,
         predict_batch_size=parser_args.predict_batch_size,
         nproc=parser_args.nproc,
     )
@@ -553,7 +687,9 @@ if __name__ == "__main__":
             seq_clf_explanations[claim.id],
         )
 
-    # claimant classification predictions and explanations
+    ###############################
+    ### claimant classification ###
+    ###############################
     log_title(_logger, "generating claimant predictions")
     claimant_predictions, claimant_explanations = claimant_classification(
         claims=claims, claimant_model_file=parser_args.claimant_model_file
@@ -568,16 +704,21 @@ if __name__ == "__main__":
             claimant_explanations[claim.id],
         )
 
-    # compile final output
+    ############################
+    ### compile final output ###
+    ############################
     log_title(_logger, "compiling output")
     output = compile_final_output(
         claims=claims,
+        articles_dict=articles_dict,
         seq_clf_predictions=seq_clf_predictions,
         claimant_predictions=claimant_predictions,
     )
     _logger.info(json.dumps(dict(list(output.items())[:5]), indent=2))
 
-    # write output to json
+    #####################################
+    ### write output predictions file ###
+    #####################################
     log_title(_logger, "writing predictions to {}".format(parser_args.predictions_file))
     with open(parser_args.predictions_file, "w") as fo:
         json.dump(output, fo, indent=2)
@@ -585,4 +726,4 @@ if __name__ == "__main__":
         raise ValueError("predictions file was not created")
 
     # done :)
-    log_title(_logger, "done")
+    log_title(_logger, "done :)")
