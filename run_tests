@@ -53,5 +53,5 @@ source $ENVRC_FILE
 export LEADERS_PRIZE_API_KEY="not-a-real-value"
 run_test "api"
 
-# source $ENVRC_FILE
-# run_test "test"
+source $ENVRC_FILE
+run_test "test"
