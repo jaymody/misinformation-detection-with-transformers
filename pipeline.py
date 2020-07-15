@@ -3,6 +3,7 @@ import json
 import heapq
 import random
 import argparse
+import warnings
 import collections
 import multiprocessing
 
@@ -37,6 +38,9 @@ furthermore_syns = [
 
 log_title(_logger, "loading spacy")
 nlp = spacy.load("en_core_web_lg")
+
+# ignore spacy doc similarity error for docs with empty vectors
+warnings.filterwarnings("ignore", message=r"\[W008\]", category=UserWarning)
 
 
 ######################################
