@@ -94,6 +94,9 @@ data fixes).
 Screening the text_b content of the rerank examples to the top 32 most relevant
 sentences in the articles also had a significant improvement on the results vs
 simply taking the article content as a whole (most of which will be truncated).
+
+Finally, nlp.pipe (batch multiprocessing of spacy docs) was replaced with the
+good old individual nlp() calls because nlp.pipe may be causing memory crashes.
 "
 FNC_MODEL_DIR="models/phase2/single-claim-claimant-date/roberta-large-combined-128-2"
 RERANK_MODEL_DIR="models/rerank/castroni/monobert-large-msmarco"
