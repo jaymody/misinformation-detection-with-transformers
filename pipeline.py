@@ -185,19 +185,33 @@ def generate_text_a_dict(claims):
 
 
 def get_articles_dict(claims):
-    return {
-        hit["article"].id: hit["article"]
-        for claim in claims
-        if claim.res
-        for hit in claim.res["hits"]["hits"]
-    }
+    articles_dict = {}
+    for claim in claims:
+        if not claim.res:
+            continue
+        for hit in claim.res["hits"]["hits"]:
+            article = hit["article"]
+            articles_dict[article.id] = article
+    return articles_dict
 
 
-def get_hits_dict(claims):
-    return {
-        claim.id: [hit for hit in claim.res["hits"]["hits"]] if claim.res else []
-        for claim in claims
-    }
+def get_hits_dict(claims, articles_dict):
+    # we need to use articles_dict here because a claim can have
+    hits_dict = {}
+    for claim in claims:
+        hits_dict[claim.id] = (
+            [
+                {
+                    "url": hit["url"],
+                    "article": articles_dict[hit["url"]],
+                    "score": hit["score"],
+                }
+                for hit in claim.res["hits"]["hits"]
+            ]
+            if claim.res
+            else []
+        )
+    return hits_dict
 
 
 def generate_article_docs_dict(articles):
@@ -567,7 +581,8 @@ if __name__ == "__main__":
     log_msg = ""
     for i, claim in enumerate(claims):
         claim.doc = claim_docs_dict[claim.id]
-        log_msg += "\nclaim_id = {}\n{}\n".format(claim.id, claim.doc.text)
+        if i < 5:
+            log_msg += "\nclaim_id = {}\n{}\n".format(claim.id, claim.doc.text)
     _logger.info("first 5 claim doc texts:\n%s", log_msg)
 
     claim_text_a_dict = generate_text_a_dict(claims=claims)
@@ -605,8 +620,9 @@ if __name__ == "__main__":
     ########################
     log_title(_logger, "process related articles")
     articles_dict = get_articles_dict(claims=claims)
+    _logger.info("  num articles in articles_dict:  %d", len(articles_dict))
 
-    hits_dict = get_hits_dict(claims=claims)
+    hits_dict = get_hits_dict(claims=claims, articles_dict=articles_dict)
     log_msg = ""
     num_total_hits = 0
     no_hits_claims = 0
