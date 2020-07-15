@@ -68,7 +68,7 @@ exec 2>&1
 ################################################################################
 
 # edit these for each run
-SUBMISSION_NAME="jaymody_phase2_submission_6"
+SUBMISSION_NAME="jaymody_phase2_submission_7"
 DESCRIPTION="
 The main change with this submission is that related articles are selected
 using document reranking via monobert. The input examples for reranking are
