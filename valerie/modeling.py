@@ -315,7 +315,7 @@ class ClaimantModel:
     id2label = {0: "false", 1: "partly", 2: "true"}
 
     def __init__(self, model={}):
-        self.model = model
+        self.model = {k.lower(): v for k, v in model.items()}
 
     @classmethod
     def from_pretrained(cls, model_file):
@@ -331,26 +331,26 @@ class ClaimantModel:
 
     def predict(self, claim):
         try:
-            entry = self.model[claim.claimant]
+            entry = self.model[claim.claimant.lower()]
 
             probs = np.zeros(len(self.id2label))
             for i, label in self.id2label.items():
                 probs[i] = entry[label] / entry["total"]
 
             return probs
-        except KeyError:
+        except:
             return None
 
     def num_examples(self, claim):
         try:
-            return self.model[claim.claimant]["total"]
-        except KeyError:
+            return self.model[claim.claimant.lower()]["total"]
+        except:
             return None
 
     def score(self, claim):
         try:
-            return self.model[claim.claimant]["score"]
-        except KeyError:
+            return self.model[claim.claimant.lower()]["score"]
+        except:
             return None
 
     @classmethod
@@ -360,9 +360,9 @@ class ClaimantModel:
         )
 
         for claim in claims:
-            model[claim.claimant][cls.id2label[claim.label]] += 1
-            model[claim.claimant]["total"] += 1
-            model[claim.claimant]["score"] += claim.label / 2
+            model[claim.claimant.lower()][cls.id2label[claim.label]] += 1
+            model[claim.claimant.lower()]["total"] += 1
+            model[claim.claimant.lower()]["score"] += claim.label / 2
 
         for v in model.values():
             v["score"] /= v["total"]
