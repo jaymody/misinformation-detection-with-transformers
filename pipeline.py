@@ -267,12 +267,12 @@ def generate_support_dict(claims, keep_top_n_sentences=32):
     return support_dict
 
 
-############################
-########## Rerank ##########
-############################
+#################################
+########## Rerank Hits ##########
+#################################
 
 
-def generate_rerank_examples(claims):
+def generate_rerank_hits_examples(claims):
     def generate_text_b(article, claim):
         text_b = clean_text(" ".join([s["text"] for s in claim.support[article.id]]))
         return text_b
@@ -295,7 +295,7 @@ def generate_rerank_examples(claims):
 
 
 def rerank_hits(claims, rerank_model_dir, predict_batch_size, keep_top_n, nproc):
-    examples = generate_rerank_examples(claims)
+    examples = generate_rerank_hits_examples(claims)
     _logger.info(
         "first 5 rerank examples:\n%s",
         json.dumps([example.__dict__ for example in examples[:5]], indent=2),
@@ -328,6 +328,65 @@ def rerank_hits(claims, rerank_model_dir, predict_batch_size, keep_top_n, nproc)
         rerank_hits_dict[k] = {i + 1: x["art_id"] for i, x in enumerate(top_n_hits)}
 
     return rerank_hits_dict
+
+
+####################################
+########## Rerank Support ##########
+####################################
+
+
+def generate_rerank_support_examples(claims, rerank_top_n):
+    examples = []
+    for claim in tqdm(claims):
+        for art_id in claim.related_articles.values():
+            for sup in claim.support[art_id][:rerank_top_n]:
+                examples.append(
+                    SequenceClassificationExample(
+                        guid=claim.id,
+                        text_a=claim.text_a.text,
+                        text_b=sup["text"],
+                        art_id=art_id,
+                    )
+                )
+    return examples
+
+
+def rerank_support(
+    claims, rerank_model_dir, predict_batch_size, rerank_top_n, keep_top_n, nproc
+):
+    examples = generate_rerank_support_examples(claims, rerank_top_n)
+    _logger.info(
+        "first 5 rerank examples:\n%s",
+        json.dumps([example.__dict__ for example in examples[:5]], indent=2),
+    )
+
+    probabilities = _sequence_classification(
+        examples, rerank_model_dir, predict_batch_size=predict_batch_size, nproc=nproc,
+    )
+
+    if len(probabilities) != len(examples):
+        raise ValueError(
+            "len predictions ({}) != len examples ({})".format(
+                len(probabilities), len(examples)
+            )
+        )
+
+    # we use this for initialization instead of collection.defaultdict(list)
+    # because there is a possibilty that a claim has no support examples, in
+    # which case we still want it in the below dict, but with an empty entry
+    reranked_support_dict = {claim.id: [] for claim in claims}
+    for example, proba in tqdm(zip(examples, probabilities)):
+        proba = float(proba[1])  # gets relatedness score of example
+        reranked_support_dict[example.guid].append(
+            {"art_id": example.art_id, "text": example.text_b, "score": proba}
+        )
+
+    for k, sents in reranked_support_dict.items():
+        reranked_support_dict[k] = heapq.nlargest(
+            keep_top_n, sents, key=lambda x: x["score"]
+        )
+
+    return reranked_support_dict
 
 
 #############################################
@@ -384,7 +443,9 @@ def sequence_classification(claims, fnc_model_dir, predict_batch_size, nproc):
         elif pred == 1:
             explanations[example.guid] = (
                 "The AI model detected patterns in the claim consitent with "
-                "clickbait and/or partial truth."
+                "clickbait, divisive rhetoric, and/or construed facts. The claim "
+                "may contain partial truth, however it may be presented in a "
+                "misleading or exaggerated fashion."
             )
         else:
             explanations[example.guid] = (
@@ -408,7 +469,11 @@ def claimant_classification(claims, claimant_model_file):
     explanations = {}
     for claim in tqdm(claims, desc="ClaimantModel predictions"):
         pred = claimant_model.predict(claim)
-        if pred is None:
+        try:
+            score = float(claimant_model.score(claim))
+        except:
+            score = None
+        if pred is None or claim.claimant == "":
             predictions[claim.id] = -1
             explanations[claim.id] = ""
             continue
@@ -417,13 +482,21 @@ def claimant_classification(claims, claimant_model_file):
         assert pred in label_set, pred
         predictions[claim.id] = pred
 
-        if pred == 0:
+        if score is not None and score < 0.2 and pred == 0:
+            explanations[claim.id] = (
+                "The claimant is very unreliable, with an"
+                " extensive record of misinformation (with an honesty score"
+                " below 0.2, yikes!). Further investigation shows that the"
+                " patterns in this claim are consitent with the claimant's"
+                " previous false claims on this topic."
+            )
+        elif pred == 0:
             explanations[claim.id] = (
                 "This is also supported by the fact that the claimant has a history "
                 "of misinformation, having previously made {} (out of {}) "
                 "false statements.".format(
-                    claimant_model.model[claim.claimant]["false"],
-                    claimant_model.model[claim.claimant]["total"],
+                    claimant_model.model[claim.claimant.lower()]["false"],
+                    claimant_model.model[claim.claimant.lower()]["total"],
                 )
             )
         elif pred == 1:
@@ -431,8 +504,8 @@ def claimant_classification(claims, claimant_model_file):
                 "This is also supported by the fact that the claimant has a mixed "
                 "record, having previously made {} (out of {}) partially "
                 "correct/incorrect statements.".format(
-                    claimant_model.model[claim.claimant]["partly"],
-                    claimant_model.model[claim.claimant]["total"],
+                    claimant_model.model[claim.claimant.lower()]["partly"],
+                    claimant_model.model[claim.claimant.lower()]["total"],
                 )
             )
         else:
@@ -440,8 +513,8 @@ def claimant_classification(claims, claimant_model_file):
                 "This is also supported by the fact that the claimant has a good "
                 "track record, having previously made "
                 "{} (out of {}) factual statements.".format(
-                    claimant_model.model[claim.claimant]["true"],
-                    claimant_model.model[claim.claimant]["total"],
+                    claimant_model.model[claim.claimant.lower()]["true"],
+                    claimant_model.model[claim.claimant.lower()]["total"],
                 )
             )
 
@@ -476,22 +549,22 @@ def compile_final_output(
         # explanation
         explanation = []
 
-        first_source = None
+        first_art = None
         try:
-            for i, art_id in related_articles.items():
-                if art_id not in claim.support or not claim.support[art_id]:
+            for sup in claim.reranked_support:
+                if len(explanation) >= 2:  # this should never happen in theory
                     continue
 
-                sup = claim.support[art_id][0]
-
-                if len(explanation) >= 2 or sup["score"] < 0.80:
+                # threshold determined via manual inspection that gives
+                # the most reasonable results while still giving a result
+                # at least half the time
+                if sup["score"] < 0.30:
                     continue
 
                 sup_text = sup["text"]
                 if len(sup_text) > 340:
                     sup_text = sup_text[:335] + " ..."
 
-                article = articles_dict[art_id]
                 if len(explanation) == 0:
                     explanation.append(
                         "The claim is {}, as explained in the {} "
@@ -499,8 +572,8 @@ def compile_final_output(
                             id2label[pred], number2place[i], sup_text,
                         )
                     )
-                    first_source = article.source
-                elif article.source == first_source and first_source is not None:
+                    first_art = sup["art_id"]
+                elif sup["art_id"] == first_art and first_art is not None:
                     explanation.append(
                         '{}, the article goes on to say "{}".'.format(
                             random.choice(furthermore_syns), sup_text,
@@ -511,12 +584,15 @@ def compile_final_output(
                         "This conclusion is also confirmed by the {} article{}, "
                         '"{}".'.format(
                             number2place[i],
-                            " from " + article.source if article.source else "",
+                            " from " + sup["art_id"] if sup["art_id"] else "",
                             sup_text[:400],
                         )
                     )
         except:
             explanation = []
+
+        if claimant_predictions[claim.id] == -2:  # if the claimant is a known liar
+            explanation.append(claimant_explanations[claim.id])
 
         # backup default explanation
         if not explanation:
@@ -669,9 +745,9 @@ if __name__ == "__main__":
         "first 5 claim support (top 3 articles, top 3 sentences):\n%s", log_msg
     )
 
-    ##############
-    ### rerank ###
-    ##############
+    ###################
+    ### rerank hits ###
+    ###################
     log_title(_logger, "rerank and select top 2 articles")
     rerank_hits_dict = rerank_hits(
         claims=claims,
@@ -689,6 +765,27 @@ if __name__ == "__main__":
                     claim.id, str(j), articles_dict[article_id].logstr(),
                 )
     _logger.info("first 5 claims chosen reranked articles:\n%s", log_msg)
+
+    ######################
+    ### rerank support ###
+    ######################
+    log_title(_logger, "rerank support evidence (top 2 related sentences)")
+    reranked_support_dict = rerank_support(
+        claims=claims,
+        rerank_model_dir=parser_args.rerank_model_dir,
+        predict_batch_size=parser_args.predict_batch_size,
+        rerank_top_n=10,
+        keep_top_n=2,
+        nproc=parser_args.nproc,
+    )
+    log_msg = ""
+    for i, claim in enumerate(claims):
+        claim.reranked_support = reranked_support_dict[claim.id]
+        if i < 5:
+            log_msg += "\nclaim_id = {}\n{}\n".format(
+                claim.id, json.dumps(claim.reranked_support, indent=2,),
+            )
+    _logger.info("first 5 claim reranked support sentences:\n%s", log_msg)
 
     ###############################
     ### sequence classification ###
