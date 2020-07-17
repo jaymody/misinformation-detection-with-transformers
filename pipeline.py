@@ -550,46 +550,54 @@ def compile_final_output(
         explanation = []
 
         first_art = None
-        try:
-            for sup in claim.reranked_support:
-                if len(explanation) >= 2:  # this should never happen in theory
-                    continue
+        for sup in claim.reranked_support:
+            art_num = None
+            for rel_art_num, rel_art_id in claim.related_articles.items():
+                if rel_art_id == sup["art_id"]:
+                    art_num = rel_art_num
+                    break
+            if art_num is None:
+                raise ValueError(
+                    "support article id is not one of the related_articles"
+                )
 
-                # threshold determined via manual inspection that gives
-                # the most reasonable results while still giving a result
-                # at least half the time
-                if sup["score"] < 0.30:
-                    continue
+            article = articles_dict[sup["art_id"]]
+            if len(explanation) >= 2:  # this should never happen in theory
+                continue
 
-                sup_text = sup["text"]
-                if len(sup_text) > 340:
-                    sup_text = sup_text[:335] + " ..."
+            # threshold determined via manual inspection that gives
+            # the most reasonable results while still giving a result
+            # at least half the time
+            if sup["score"] < 0.30:
+                continue
 
-                if len(explanation) == 0:
-                    explanation.append(
-                        "The claim is {}, as explained in the {} "
-                        'article, which states "{}".'.format(
-                            id2label[pred], number2place[i], sup_text,
-                        )
+            sup_text = sup["text"]
+            if len(sup_text) > 340:
+                sup_text = sup_text[:335] + " ..."
+
+            if len(explanation) == 0:
+                explanation.append(
+                    "The claim is {}, as explained in the {} "
+                    'article, which states "{}".'.format(
+                        id2label[pred], number2place[art_num], sup_text,
                     )
-                    first_art = sup["art_id"]
-                elif sup["art_id"] == first_art and first_art is not None:
-                    explanation.append(
-                        '{}, the article goes on to say "{}".'.format(
-                            random.choice(furthermore_syns), sup_text,
-                        )
+                )
+                first_art = sup["art_id"]
+            elif sup["art_id"] == first_art and first_art is not None:
+                explanation.append(
+                    '{}, the article goes on to say "{}".'.format(
+                        random.choice(furthermore_syns), sup_text,
                     )
-                else:
-                    explanation.append(
-                        "This conclusion is also confirmed by the {} article{}, "
-                        '"{}".'.format(
-                            number2place[i],
-                            " from " + sup["art_id"] if sup["art_id"] else "",
-                            sup_text[:400],
-                        )
+                )
+            else:
+                explanation.append(
+                    "This conclusion is also confirmed by the {} article{}, "
+                    '"{}".'.format(
+                        number2place[art_num],
+                        " from " + article.source if article.source else "",
+                        sup_text[:400],
                     )
-        except:
-            explanation = []
+                )
 
         if claimant_predictions[claim.id] == -2:  # if the claimant is a known liar
             explanation.append(claimant_explanations[claim.id])
