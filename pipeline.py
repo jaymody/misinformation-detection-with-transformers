@@ -340,7 +340,7 @@ def rerank_hits(claims, rerank_model_dir, predict_batch_size, keep_top_n, nproc)
 
     for k, hits in rerank_hits_dict.items():
         top_n_hits = heapq.nlargest(keep_top_n, hits, key=lambda x: x["score"])
-        rerank_hits_dict[k] = {(x["art_id"], x["score"]) for x in top_n_hits}
+        rerank_hits_dict[k] = [(x["art_id"], x["score"]) for x in top_n_hits]
 
     return rerank_hits_dict
 
