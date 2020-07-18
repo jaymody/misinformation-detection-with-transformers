@@ -566,7 +566,7 @@ def compile_final_output(
 
         # social media related explanations
         if not explanation:
-            if claim.claimant in social_media_claimants and pred == 0:
+            if claim.claimant.lower() in social_media_claimants and pred == 0:
                 explanation.append(
                     "The claim contains patterns consitent with malicious and/or "
                     "clickbait fake news designed to spread fear. "
@@ -574,7 +574,7 @@ def compile_final_output(
                     "social media based misinformation, that is spread through "
                     "the claims ability to outrage the reader."
                 )
-            elif claim.claimant in social_media_claimants and pred == 1:
+            elif claim.claimant.lower() in social_media_claimants and pred == 1:
                 explanation.append(
                     "The AI model detected patterns consitent with clickbait and/or "
                     "misrepresentation. There may be some truth to the claim, "
