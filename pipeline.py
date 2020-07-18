@@ -812,10 +812,14 @@ if __name__ == "__main__":
         seq_clf_predictions=seq_clf_predictions,
         claimant_predictions=claimant_predictions,
     )
-    _logger.info(
-        "first 5 output entries:\n%s",
-        json.dumps(dict(list(output.items())[:5]), indent=2),
-    )
+    log_msg = ""
+    for i, claim in enumerate(claims):
+        if i >= 5:
+            break
+        log_msg += "\nclaim_id = {}\n{}\n".format(
+            claim.id, json.dumps(output[claim.id]),
+        )
+    _logger.info("first 5 output entries:\n%s", log_msg)
 
     #####################################
     ### write output predictions file ###
