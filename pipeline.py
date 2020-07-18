@@ -422,8 +422,8 @@ def claimant_classification(claims, claimant_model_file):
                 "This is also supported by the fact that the claimant has a history "
                 "of misinformation, having previously made {} (out of {}) "
                 "false statements.".format(
-                    claimant_model.model[claim.claimant]["false"],
-                    claimant_model.model[claim.claimant]["total"],
+                    claimant_model.model[claim.claimant.lower()]["false"],
+                    claimant_model.model[claim.claimant.lower()]["total"],
                 )
             )
         elif pred == 1:
@@ -431,8 +431,8 @@ def claimant_classification(claims, claimant_model_file):
                 "This is also supported by the fact that the claimant has a mixed "
                 "record, having previously made {} (out of {}) partially "
                 "correct/incorrect statements.".format(
-                    claimant_model.model[claim.claimant]["partly"],
-                    claimant_model.model[claim.claimant]["total"],
+                    claimant_model.model[claim.claimant.lower()]["partly"],
+                    claimant_model.model[claim.claimant.lower()]["total"],
                 )
             )
         else:
@@ -440,8 +440,8 @@ def claimant_classification(claims, claimant_model_file):
                 "This is also supported by the fact that the claimant has a good "
                 "track record, having previously made "
                 "{} (out of {}) factual statements.".format(
-                    claimant_model.model[claim.claimant]["true"],
-                    claimant_model.model[claim.claimant]["total"],
+                    claimant_model.model[claim.claimant.lower()]["true"],
+                    claimant_model.model[claim.claimant.lower()]["total"],
                 )
             )
 
