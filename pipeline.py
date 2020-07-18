@@ -476,9 +476,10 @@ def compile_final_output(
     claims, articles_dict, seq_clf_predictions, claimant_predictions
 ):
     # sort articles by the relatedness of it's most relevant article
+    # d[1] should be the article relatedness score
     claims = sorted(
         claims,
-        key=lambda x: max([d["score"] for d in x.related_articles])
+        key=lambda x: max([d[1] for d in x.related_articles])
         if x.related_articles
         else 0,
         reverse=True,
