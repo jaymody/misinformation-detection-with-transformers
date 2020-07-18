@@ -496,6 +496,34 @@ def compile_final_output(
         related_articles = {i + 1: x["art_id"] for i, x in enumerate(top_2_articles)}
         related_articles_inv = {v: k for k, v in related_articles.items()}
 
+        # explanation
+        explanation = []
+
+        if claim_iter > round(len(claims) * 0.25):
+            if (
+                claim.claimant
+                and claim.claimant.lower() in social_media_claimants
+                and pred == 0
+            ):
+                explanation.append(
+                    "The claim contains patterns consitent with malicious and/or "
+                    "clickbait fake news designed to spread fear. "
+                    "This claim falls in line with other "
+                    "social media based misinformation, that is spread through "
+                    "the claims ability to outrage the reader."
+                )
+            elif (
+                claim.claimant
+                and claim.claimant.lower() in social_media_claimants
+                and pred == 1
+            ):
+                explanation.append(
+                    "The AI model detected patterns consitent with clickbait and/or "
+                    "misrepresentation. There may be some truth to the claim, "
+                    "however it does't provide the whole picture and contains "
+                    "biases."
+                )
+
         # for an article to be given article sentences for it's explanation,
         # it needs to be in the top N% of claims sorted by the relatedness of
         # of it's most relevant article. this way, in theory, the articles that
@@ -505,7 +533,7 @@ def compile_final_output(
         # fake news and lesser talked about news falls in this category, which
         # is more likely to be applicable to the described explanations)
         support_articles = {}
-        if claim_iter < round(len(claims) * 0.86):
+        if not explanation and claim_iter < round(len(claims) * 0.95):
             for art_num, hit in enumerate(top_2_articles):
                 # don't use the second article if it's score is below 3.0
                 if art_num < 1 or hit["score"] > 0.3:
@@ -523,7 +551,6 @@ def compile_final_output(
                     )
         relevant_support = heapq.nlargest(2, relevant_support, key=lambda x: x["score"])
 
-        explanation = []
         first_art_id = None
         for sup in relevant_support:
             sup_text = sup["text"]
