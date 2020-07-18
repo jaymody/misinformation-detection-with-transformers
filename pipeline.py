@@ -505,7 +505,7 @@ def compile_final_output(
         # fake news and lesser talked about news falls in this category, which
         # is more likely to be applicable to the described explanations)
         support_articles = {}
-        if claim_iter < round(len(claims) * 0.70):
+        if claim_iter < round(len(claims) * 0.86):
             for art_num, hit in enumerate(top_2_articles):
                 # don't use the second article if it's score is below 3.0
                 if art_num < 1 or hit["score"] > 0.3:
