@@ -478,7 +478,9 @@ def compile_final_output(
     # sort articles by the relatedness of it's most relevant article
     claims = sorted(
         claims,
-        key=lambda x: max(x.related_articles.values()) if x.related_articles else 0,
+        key=lambda x: max([d["score"] for d in x.related_articles])
+        if x.related_articles
+        else 0,
         reverse=True,
     )
 
@@ -488,9 +490,7 @@ def compile_final_output(
         pred = seq_clf_predictions[claim.id]
 
         # related articles
-        related_articles = claim.related_articles[
-            :2
-        ]  # should already be sorted by score
+        related_articles = claim.related_articles[:2]
         related_articles = {i + 1: x["art_id"] for i, x in enumerate(related_articles)}
         related_articles_inv = {v: k for k, v in related_articles.items()}
 
@@ -509,7 +509,7 @@ def compile_final_output(
             ):
                 # don't use the second article if it's score is below 3.0
                 if art_num < 1 or rel_art_score > 0.3:
-                    support_articles[related_articles_inv[art_id]] = art_id
+                    support_articles[related_articles_inv[rel_art_id]] = rel_art_id
 
         relevant_support = []
         for art_num, art_id in support_articles.items():
