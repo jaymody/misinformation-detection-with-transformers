@@ -523,6 +523,7 @@ def compile_final_output(
                     )
         relevant_support = heapq.nlargest(2, relevant_support, key=lambda x: x["score"])
 
+        explanation = []
         first_art_id = None
         for sup in relevant_support:
             sup_text = sup["text"]
