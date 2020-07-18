@@ -536,7 +536,7 @@ def compile_final_output(
                     "The claim was confirmed{} in the {} article, "
                     '"{}".'.format(
                         " by " + (article.source if article.source else ""),
-                        number2place[sup[art_num]],
+                        number2place[sup["art_num"]],
                         sup_text,
                     )
                 )
@@ -544,7 +544,7 @@ def compile_final_output(
                 explanation.append(
                     "The claim is {}, as explained in the {} "
                     'article, which wrote "{}".'.format(
-                        id2label[pred], number2place[sup[art_num]], sup_text,
+                        id2label[pred], number2place[sup["art_num"]], sup_text,
                     )
                 )
                 first_art_id = sup["art_id"]
@@ -558,7 +558,7 @@ def compile_final_output(
                 explanation.append(
                     "This conclusion can also be drawn from article {}{}, "
                     'stating "{}".'.format(
-                        sup[art_num],
+                        sup["art_num"],
                         " by " + article.source if article.source else "",
                         sup_text[:400],
                     )
