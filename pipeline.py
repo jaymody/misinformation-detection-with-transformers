@@ -817,7 +817,7 @@ if __name__ == "__main__":
         if i >= 5:
             break
         log_msg += "\nclaim_id = {}\n{}\n".format(
-            claim.id, json.dumps(output[claim.id]),
+            claim.id, json.dumps(output[claim.id], indent=2),
         )
     _logger.info("first 5 output entries:\n%s", log_msg)
 
