@@ -340,7 +340,9 @@ def rerank_hits(claims, rerank_model_dir, predict_batch_size, keep_top_n, nproc)
 
     for k, hits in rerank_hits_dict.items():
         top_n_hits = heapq.nlargest(keep_top_n, hits, key=lambda x: x["score"])
-        rerank_hits_dict[k] = [(x["art_id"], x["score"]) for x in top_n_hits]
+        rerank_hits_dict[k] = [
+            {"art_id": x["art_id"], "score": x["score"]} for x in top_n_hits
+        ]
 
     return rerank_hits_dict
 
@@ -476,10 +478,9 @@ def compile_final_output(
     claims, articles_dict, seq_clf_predictions, claimant_predictions
 ):
     # sort articles by the relatedness of it's most relevant article
-    # d[1] should be the article relatedness score
     claims = sorted(
         claims,
-        key=lambda x: max([d[1] for d in x.related_articles])
+        key=lambda x: max([hit["score"] for hit in x.related_articles])
         if x.related_articles
         else 0,
         reverse=True,
@@ -491,8 +492,8 @@ def compile_final_output(
         pred = seq_clf_predictions[claim.id]
 
         # related articles
-        related_articles = claim.related_articles[:2]
-        related_articles = {i + 1: x["art_id"] for i, x in enumerate(related_articles)}
+        top_2_articles = claim.related_articles[:2]
+        related_articles = {i + 1: x["art_id"] for i, x in enumerate(top_2_articles)}
         related_articles_inv = {v: k for k, v in related_articles.items()}
 
         # for an article to be given article sentences for it's explanation,
@@ -505,12 +506,12 @@ def compile_final_output(
         # is more likely to be applicable to the described explanations)
         support_articles = {}
         if claim_iter < round(len(claims) * 0.70):
-            for art_num, (rel_art_id, rel_art_score) in enumerate(
-                claim.related_articles
-            ):
+            for art_num, hit in enumerate(top_2_articles):
                 # don't use the second article if it's score is below 3.0
-                if art_num < 1 or rel_art_score > 0.3:
-                    support_articles[related_articles_inv[rel_art_id]] = rel_art_id
+                if art_num < 1 or hit["score"] > 0.3:
+                    support_articles[related_articles_inv[hit["art_id"]]] = hit[
+                        "art_id"
+                    ]
 
         relevant_support = []
         for art_num, art_id in support_articles.items():
@@ -755,9 +756,9 @@ if __name__ == "__main__":
     for i, claim in enumerate(claims):
         claim.related_articles = rerank_hits_dict[claim.id]
         if i < 5:
-            for article_id, article_score in claim.related_articles:
+            for hit in claim.related_articles:
                 log_msg += "\nclaim_id = {}\narticle score = {:.3f}\n{}\n".format(
-                    claim.id, article_score, articles_dict[article_id].logstr(),
+                    claim.id, hit["score"], articles_dict[hit["art_id"]].logstr(),
                 )
     _logger.info("first 5 claims chosen reranked articles:\n%s", log_msg)
 
