@@ -503,7 +503,7 @@ def compile_final_output(
         # fake news and lesser talked about news falls in this category, which
         # is more likely to be applicable to the described explanations)
         support_articles = {}
-        if claim_iter < 70:
+        if claim_iter < round(len(claims) * 0.70):
             for art_num, (rel_art_id, rel_art_score) in enumerate(
                 claim.related_articles
             ):
