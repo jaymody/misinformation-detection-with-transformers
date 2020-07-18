@@ -584,7 +584,7 @@ def compile_final_output(
             else:
                 explanation.append(seq_clf_explanations[claim.id])
 
-        if claimant_predictions[claim.id] == pred:
+        if claimant_predictions[claim.id] == pred and claim.claimant:
             explanation.append(claimant_explanations[claim.id])
 
         explanation = [e for e in explanation if e]
