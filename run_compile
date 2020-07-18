@@ -68,35 +68,35 @@ exec 2>&1
 ################################################################################
 
 # edit these for each run
-SUBMISSION_NAME="jaymody_phase2_submission_7"
+SUBMISSION_NAME="jaymody_phase2_submission_9"
 DESCRIPTION="
-The main change with this submission is that related articles are selected
-using document reranking via monobert. The input examples for reranking are
-claim-article pairs:
+This submission uses the same pipeline as submission_7:
 
-[CLS] claim + claimant + date [SEP] top 32 most relevant sentences in the article determined via spacy similarity [SEP]
+1. read metadata
+2. convert to a list of claims objects (preprocessing + spacy)
+3. fetch responses and convert the html to article objects
+- query expansion: stopword removal + text cleaning + remove lone punctuation + claimant + date
+4. process articles (spacy)
+5. generate support (ie find relevant sentences) for each claim-article pair
+6. rerank hits using monobert (bert large pretrained on msmarco)
+- text_a is the claim + claimant + date
+- text_b is the top 32 most relevant sentences from the article (determined by spacy)
+7. perform sequence classification using roberta large
+- text_a is the claim
+- text_b is claimant + date
+8. claimant classification based on claimant history
+9. compile final output as a combination of explanations + supporting evidence from articles
+10. write output file
+11. profit
 
-The top 32 most relevant sentences may also include the words extracted from the
-url, the source of the article (ie CNN), and the title of the article.
+The major difference between this submission and submission_9 are the explanations.
+The explanation logic is a bit more complex, hopefully better utilizing the supporting
+evidence by ignoring it for articles that are less likely to be related.
 
-The other major addition is the much needed improvment and adoption of logging
-at (almost) all stages of the pipeline for easier debugging and clarity as to
-what is actually going on.
+In addition, the claimant model was updated to v2, which uses lower case claimant
+names (just incase) and is trained on more data (trail data + validation data).
 
-In my experiments, I found a significant boost in the quality of related
-chosen using monobert instead of the api score. This was both consitent in the
-automated score of the related articles as well as through manual inspection.
-
-The only instance where there was a dip in performance was with the 100
-validation dataset (however, I think this is an issue with the last minute
-data fixes).
-
-Screening the text_b content of the rerank examples to the top 32 most relevant
-sentences in the articles also had a significant improvement on the results vs
-simply taking the article content as a whole (most of which will be truncated).
-
-Finally, nlp.pipe (batch multiprocessing of spacy docs) was replaced with the
-good old individual nlp() calls because nlp.pipe may be causing memory crashes.
+See the commit history and comments for a more comprehensive list of changes.
 "
 FNC_MODEL_DIR="models/phase2/single-claim-claimant-date/roberta-large-combined-128-2"
 RERANK_MODEL_DIR="models/rerank/castroni/monobert-large-msmarco"
