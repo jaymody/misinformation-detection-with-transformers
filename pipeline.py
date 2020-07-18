@@ -340,7 +340,7 @@ def rerank_hits(claims, rerank_model_dir, predict_batch_size, keep_top_n, nproc)
 
     for k, hits in rerank_hits_dict.items():
         top_n_hits = heapq.nlargest(keep_top_n, hits, key=lambda x: x["score"])
-        rerank_hits_dict[k] = {i + 1: x["art_id"] for i, x in enumerate(top_n_hits)}
+        rerank_hits_dict[k] = {(x["art_id"], x["score"]) for x in top_n_hits}
 
     return rerank_hits_dict
 
@@ -398,14 +398,18 @@ def sequence_classification(claims, fnc_model_dir, predict_batch_size, nproc):
             )
         elif pred == 1:
             explanations[example.guid] = (
-                "The AI model detected patterns in the claim consitent with "
-                "clickbait and/or partial truth."
+                "The AI model detected some inconsitencies with the claim and "
+                "the information in the articles. It's possible that the claim "
+                "is biased and/or exaggerated to fit a certain narrative."
             )
         else:
             explanations[example.guid] = (
                 "The AI model couldn't detect any patterns in the claim "
                 "consitent with misinformation, clickbait, disinformation, or "
-                "fake news, suggesting that the claim is likely true."
+                "fake news. {}, the contents of the articles do not contradict "
+                "the claim. This claim is likely true.".format(
+                    random.choice(furthermore_syns)
+                )
             )
 
     return predictions, explanations
@@ -434,7 +438,7 @@ def claimant_classification(claims, claimant_model_file):
 
         if pred == 0:
             explanations[claim.id] = (
-                "This is also supported by the fact that the claimant has a history "
+                "This is also substantiated by looking at the claimant's history "
                 "of misinformation, having previously made {} (out of {}) "
                 "false statements.".format(
                     claimant_model.model[claim.claimant.lower()]["false"],
@@ -452,7 +456,7 @@ def claimant_classification(claims, claimant_model_file):
             )
         else:
             explanations[claim.id] = (
-                "This is also supported by the fact that the claimant has a good "
+                "This is further backed by the claimant's good "
                 "track record, having previously made "
                 "{} (out of {}) factual statements.".format(
                     claimant_model.model[claim.claimant.lower()]["true"],
@@ -471,71 +475,111 @@ def claimant_classification(claims, claimant_model_file):
 def compile_final_output(
     claims, articles_dict, seq_clf_predictions, claimant_predictions
 ):
+    # sort articles by the relatedness of it's most relevant article
+    claims = sorted(
+        claims,
+        key=lambda x: max(x.related_articles.values()) if x.related_articles else 0,
+        reverse=True,
+    )
+
     output = {}
-    for claim in claims:
-        # label (predicted)
+    for claim_iter, claim in enumerate(claims):
+        # predicted label
         pred = seq_clf_predictions[claim.id]
-        assert isinstance(pred, int)
-        assert pred in label_set
 
         # related articles
-        related_articles = list(claim.related_articles.values())
-        related_articles = related_articles[:2]
-        related_articles = {i + 1: x for i, x in enumerate(related_articles)}
-        assert isinstance(related_articles, dict)
-        assert len(related_articles) >= 0 and len(related_articles) <= 2
-        for k, v in related_articles.items():
-            assert k in {1, 2}
-            assert isinstance(v, str)
+        related_articles = claim.related_articles[
+            :2
+        ]  # should already be sorted by score
+        related_articles = {i + 1: x["art_id"] for i, x in enumerate(related_articles)}
+        related_articles_inv = {v: k for k, v in related_articles.items()}
 
-        # explanation
-        explanation = []
+        # for an article to be given article sentences for it's explanation,
+        # it needs to be in the top N% of claims sorted by the relatedness of
+        # of it's most relevant article. this way, in theory, the articles that
+        # are of higher quality (and are more likely to be related) will use support
+        # while the "worse" articles will be given the attention, claimant, and
+        # pattern related explanations that are more relevant (typically malicous
+        # fake news and lesser talked about news falls in this category, which
+        # is more likely to be applicable to the described explanations)
+        support_articles = {}
+        if claim_iter < 70:
+            for art_num, (rel_art_id, rel_art_score) in enumerate(
+                claim.related_articles
+            ):
+                # don't use the second article if it's score is below 3.0
+                if art_num < 1 or rel_art_score > 0.3:
+                    support_articles[related_articles_inv[art_id]] = art_id
 
-        first_source = None
-        try:
-            for i, art_id in related_articles.items():
-                if art_id not in claim.support or not claim.support[art_id]:
-                    continue
-
-                sup = claim.support[art_id][0]
-
-                if len(explanation) >= 2 or sup["score"] < 0.80:
-                    continue
-
-                sup_text = sup["text"]
-                if len(sup_text) > 340:
-                    sup_text = sup_text[:335] + " ..."
-
-                article = articles_dict[art_id]
-                if len(explanation) == 0:
-                    explanation.append(
-                        "The claim is {}, as explained in the {} "
-                        'article, which states "{}".'.format(
-                            id2label[pred], number2place[i], sup_text,
-                        )
+        relevant_support = []
+        for art_num, art_id in support_articles.items():
+            # this should be the case already, but just incase ...
+            if art_id in claim.support:
+                for sup in claim.support[art_id]:
+                    relevant_support.append(
+                        {**sup, "art_id": art_id, "art_num": art_num}
                     )
-                    first_source = article.source
-                elif article.source == first_source and first_source is not None:
-                    explanation.append(
-                        '{}, the article goes on to say "{}".'.format(
-                            random.choice(furthermore_syns), sup_text,
-                        )
-                    )
-                else:
-                    explanation.append(
-                        "This conclusion is also confirmed by the {} article{}, "
-                        '"{}".'.format(
-                            number2place[i],
-                            " from " + article.source if article.source else "",
-                            sup_text[:400],
-                        )
-                    )
-        except:
-            explanation = []
+        relevant_support = heapq.nlargest(2, relevant_support, key=lambda x: x["score"])
 
-        # backup default explanation
+        first_art_id = None
+        for sup in relevant_support:
+            sup_text = sup["text"]
+            if len(sup_text) > 340:
+                sup_text = sup_text[:335] + " ..."
+
+            article = articles_dict[sup["art_id"]]
+            if len(explanation) == 0 and pred == 2:
+                explanation.append(
+                    "The claim was confirmed{} in the {} article, "
+                    '"{}".'.format(
+                        " by " + (article.source if article.source else ""),
+                        number2place[sup[art_num]],
+                        sup_text,
+                    )
+                )
+            elif len(explanation) == 0:
+                explanation.append(
+                    "The claim is {}, as explained in the {} "
+                    'article, which wrote "{}".'.format(
+                        id2label[pred], number2place[sup[art_num]], sup_text,
+                    )
+                )
+                first_art_id = sup["art_id"]
+            elif sup["art_id"] == first_art_id and first_art_id is not None:
+                explanation.append(
+                    '{}, the article goes on to say "{}".'.format(
+                        random.choice(furthermore_syns), sup_text,
+                    )
+                )
+            else:
+                explanation.append(
+                    "This conclusion can also be drawn from article {}{}, "
+                    'stating "{}".'.format(
+                        sup[art_num],
+                        " by " + article.source if article.source else "",
+                        sup_text[:400],
+                    )
+                )
+
+        # social media related explanations
         if not explanation:
-            explanation.append(seq_clf_explanations[claim.id])
+            if claim.claimant in social_media_claimants and pred == 0:
+                explanation.append(
+                    "The claim contains patterns consitent with malicious and/or "
+                    "clickbait fake news designed to spread fear. "
+                    "This claim falls in line with other "
+                    "social media based misinformation, that is spread through "
+                    "the claims ability to outrage the reader."
+                )
+            elif claim.claimant in social_media_claimants and pred == 1:
+                explanation.append(
+                    "The AI model detected patterns consitent with clickbait and/or "
+                    "misrepresentation. There may be some truth to the claim, "
+                    "however it does't provide the whole picture and contains "
+                    "biases."
+                )
+            else:
+                explanation.append(seq_clf_explanations[claim.id])
 
         if claimant_predictions[claim.id] == pred:
             explanation.append(claimant_explanations[claim.id])
@@ -545,6 +589,17 @@ def compile_final_output(
         if len(explanation) > 995:
             explanation = explanation[:995] + " ..."
         explanation = explanation[:999]
+
+        # test outputs are correct
+        assert isinstance(pred, int)
+        assert pred in label_set
+
+        assert isinstance(related_articles, dict)
+        assert len(related_articles) >= 0 and len(related_articles) <= 2
+        for k, v in related_articles.items():
+            assert k in {1, 2}
+            assert isinstance(v, str)
+
         assert isinstance(explanation, str)
         assert len(explanation) < 1000
 
@@ -699,9 +754,9 @@ if __name__ == "__main__":
     for i, claim in enumerate(claims):
         claim.related_articles = rerank_hits_dict[claim.id]
         if i < 5:
-            for j, article_id in claim.related_articles.items():
-                log_msg += "\nclaim_id = {}\narticle #={}\n{}\n".format(
-                    claim.id, str(j), articles_dict[article_id].logstr(),
+            for article_id, article_score in claim.related_articles:
+                log_msg += "\nclaim_id = {}\narticle score = {:.3f}\n{}\n".format(
+                    claim.id, article_score, articles_dict[article_id].logstr(),
                 )
     _logger.info("first 5 claims chosen reranked articles:\n%s", log_msg)
 
