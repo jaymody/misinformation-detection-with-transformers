@@ -221,7 +221,7 @@ gsutil cp "${GCLOUD_RERANK_MODEL_DIR}/*" ${LOCAL_RERANK_DIR}
 
 # misc models
 gsutil cp "${GCLOUD_BUCKET}/models/source_model.json" models/
-gsutil cp "${GCLOUD_BUCKET}/models/claimant_model.json" models/
+gsutil cp "${GCLOUD_BUCKET}/models/claimant_model_v2.json" models/
 
 
 

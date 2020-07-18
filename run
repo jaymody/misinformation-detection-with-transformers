@@ -11,7 +11,7 @@ cd /root
 source .envrc
 
 # params
-CLAIMANT_MODEL_FILE="models/claimant_model.json"
+CLAIMANT_MODEL_FILE="models/claimant_model_v2.json"
 FNC_MODEL_DIR="models/fnc"
 RERANK_MODEL_DIR="models/rerank"
 
