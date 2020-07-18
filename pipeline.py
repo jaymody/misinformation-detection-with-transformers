@@ -35,6 +35,21 @@ furthermore_syns = [
     "Additionaly",
     "Moreover",
 ]
+social_media_claimants = [
+    "multiple websites",
+    "various websites",
+    "viral meme",
+    "social media posts",
+    "viral image",
+    "facebook user",
+    "chain email",
+    "chain message",
+    "instagram posts",
+    "bloggers",
+    "facebook posts",
+    "tweets",
+    "facebook post",
+]
 
 log_title(_logger, "loading spacy")
 nlp = spacy.load("en_core_web_lg")
