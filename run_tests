@@ -3,7 +3,7 @@
 # params
 ENVRC_FILE=".envrc"
 METADATA_FILE="data/phase2-3/raw/metadata.json"
-CLAIMANT_MODEL_FILE="models/claimant_model_v2.json"
+CLAIMANT_MODEL_FILE="models/claimant_model_v3.json"
 FNC_MODEL_DIR="models/phase2/single-claim-claimant/bert-base-cased-128-0"
 RERANK_MODEL_DIR="models/rerank/castroni/monobert-large-msmarco"
 

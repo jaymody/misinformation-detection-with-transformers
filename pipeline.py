@@ -340,7 +340,9 @@ def rerank_hits(claims, rerank_model_dir, predict_batch_size, keep_top_n, nproc)
 
     for k, hits in rerank_hits_dict.items():
         top_n_hits = heapq.nlargest(keep_top_n, hits, key=lambda x: x["score"])
-        rerank_hits_dict[k] = {(x["art_id"], x["score"]) for x in top_n_hits}
+        rerank_hits_dict[k] = [
+            {"art_id": x["art_id"], "score": x["score"]} for x in top_n_hits
+        ]
 
     return rerank_hits_dict
 
@@ -478,7 +480,9 @@ def compile_final_output(
     # sort articles by the relatedness of it's most relevant article
     claims = sorted(
         claims,
-        key=lambda x: max(x.related_articles.values()) if x.related_articles else 0,
+        key=lambda x: max([hit["score"] for hit in x.related_articles])
+        if x.related_articles
+        else 0,
         reverse=True,
     )
 
@@ -488,11 +492,37 @@ def compile_final_output(
         pred = seq_clf_predictions[claim.id]
 
         # related articles
-        related_articles = claim.related_articles[
-            :2
-        ]  # should already be sorted by score
-        related_articles = {i + 1: x["art_id"] for i, x in enumerate(related_articles)}
+        top_2_articles = claim.related_articles[:2]
+        related_articles = {i + 1: x["art_id"] for i, x in enumerate(top_2_articles)}
         related_articles_inv = {v: k for k, v in related_articles.items()}
+
+        # explanation
+        explanation = []
+
+        if claim_iter > round(len(claims) * 0.25):
+            if (
+                claim.claimant
+                and claim.claimant.lower() in social_media_claimants
+                and pred == 0
+            ):
+                explanation.append(
+                    "The claim contains patterns consitent with malicious and/or "
+                    "clickbait fake news designed to spread fear. "
+                    "This claim falls in line with other "
+                    "social media based misinformation, that is spread through "
+                    "the claims ability to outrage the reader."
+                )
+            elif (
+                claim.claimant
+                and claim.claimant.lower() in social_media_claimants
+                and pred == 1
+            ):
+                explanation.append(
+                    "The AI model detected patterns consitent with clickbait and/or "
+                    "misrepresentation. There may be some truth to the claim, "
+                    "however it does't provide the whole picture and contains "
+                    "biases."
+                )
 
         # for an article to be given article sentences for it's explanation,
         # it needs to be in the top N% of claims sorted by the relatedness of
@@ -503,13 +533,13 @@ def compile_final_output(
         # fake news and lesser talked about news falls in this category, which
         # is more likely to be applicable to the described explanations)
         support_articles = {}
-        if claim_iter < 70:
-            for art_num, (rel_art_id, rel_art_score) in enumerate(
-                claim.related_articles
-            ):
+        if not explanation and claim_iter < round(len(claims) * 0.95):
+            for art_num, hit in enumerate(top_2_articles):
                 # don't use the second article if it's score is below 3.0
-                if art_num < 1 or rel_art_score > 0.3:
-                    support_articles[related_articles_inv[art_id]] = art_id
+                if art_num < 1 or hit["score"] > 0.3:
+                    support_articles[related_articles_inv[hit["art_id"]]] = hit[
+                        "art_id"
+                    ]
 
         relevant_support = []
         for art_num, art_id in support_articles.items():
@@ -533,7 +563,7 @@ def compile_final_output(
                     "The claim was confirmed{} in the {} article, "
                     '"{}".'.format(
                         " by " + (article.source if article.source else ""),
-                        number2place[sup[art_num]],
+                        number2place[sup["art_num"]],
                         sup_text,
                     )
                 )
@@ -541,7 +571,7 @@ def compile_final_output(
                 explanation.append(
                     "The claim is {}, as explained in the {} "
                     'article, which wrote "{}".'.format(
-                        id2label[pred], number2place[sup[art_num]], sup_text,
+                        id2label[pred], number2place[sup["art_num"]], sup_text,
                     )
                 )
                 first_art_id = sup["art_id"]
@@ -555,7 +585,7 @@ def compile_final_output(
                 explanation.append(
                     "This conclusion can also be drawn from article {}{}, "
                     'stating "{}".'.format(
-                        sup[art_num],
+                        sup["art_num"],
                         " by " + article.source if article.source else "",
                         sup_text[:400],
                     )
@@ -563,7 +593,11 @@ def compile_final_output(
 
         # social media related explanations
         if not explanation:
-            if claim.claimant in social_media_claimants and pred == 0:
+            if (
+                claim.claimant
+                and claim.claimant.lower() in social_media_claimants
+                and pred == 0
+            ):
                 explanation.append(
                     "The claim contains patterns consitent with malicious and/or "
                     "clickbait fake news designed to spread fear. "
@@ -571,7 +605,11 @@ def compile_final_output(
                     "social media based misinformation, that is spread through "
                     "the claims ability to outrage the reader."
                 )
-            elif claim.claimant in social_media_claimants and pred == 1:
+            elif (
+                claim.claimant
+                and claim.claimant.lower() in social_media_claimants
+                and pred == 1
+            ):
                 explanation.append(
                     "The AI model detected patterns consitent with clickbait and/or "
                     "misrepresentation. There may be some truth to the claim, "
@@ -581,7 +619,7 @@ def compile_final_output(
             else:
                 explanation.append(seq_clf_explanations[claim.id])
 
-        if claimant_predictions[claim.id] == pred:
+        if claimant_predictions[claim.id] == pred and claim.claimant:
             explanation.append(claimant_explanations[claim.id])
 
         explanation = [e for e in explanation if e]
@@ -754,9 +792,9 @@ if __name__ == "__main__":
     for i, claim in enumerate(claims):
         claim.related_articles = rerank_hits_dict[claim.id]
         if i < 5:
-            for article_id, article_score in claim.related_articles:
+            for hit in claim.related_articles:
                 log_msg += "\nclaim_id = {}\narticle score = {:.3f}\n{}\n".format(
-                    claim.id, article_score, articles_dict[article_id].logstr(),
+                    claim.id, hit["score"], articles_dict[hit["art_id"]].logstr(),
                 )
     _logger.info("first 5 claims chosen reranked articles:\n%s", log_msg)
 
@@ -809,10 +847,14 @@ if __name__ == "__main__":
         seq_clf_predictions=seq_clf_predictions,
         claimant_predictions=claimant_predictions,
     )
-    _logger.info(
-        "first 5 output entries:\n%s",
-        json.dumps(dict(list(output.items())[:5]), indent=2),
-    )
+    log_msg = ""
+    for i, claim in enumerate(claims):
+        if i >= 5:
+            break
+        log_msg += "\nclaim_id = {}\n{}\n".format(
+            claim.id, json.dumps(output[claim.id], indent=2),
+        )
+    _logger.info("first 5 output entries:\n%s", log_msg)
 
     #####################################
     ### write output predictions file ###
